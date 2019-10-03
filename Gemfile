@@ -1,6 +1,11 @@
 # encoding: utf-8
 source 'https://rubygems.org'
+gemspec
 
+if Gem::Version.new(RUBY_VERSION) < Gem::Version.new('2.2.2')
+  gem 'json', '~> 1.8'
+  gem 'rack', '< 2.0'
+end
 gem 'inspec', path: '.'
 
 gem 'ffi', '>= 1.9.14'
@@ -12,6 +17,7 @@ group :omnibus do
 end
 
 group :test do
+  gem 'bundler', '~> 1.5'
   gem 'minitest', '~> 5.5'
   gem 'rake', '>= 10'
   gem 'rubocop', '= 0.49.1'
@@ -31,6 +37,8 @@ group :integration do
   if Gem::Version.new(RUBY_VERSION) >= Gem::Version.new('2.4')
     gem 'berkshelf', '~> 7'
   end
+  gem 'test-kitchen', '~> 1.6'
+  gem 'berkshelf', '~> 4.3'
   gem 'test-kitchen', '>= 1.24'
   gem 'kitchen-vagrant'
   # we need winrm v2 support >= 0.15.1
@@ -43,6 +51,8 @@ group :tools do
   gem 'pry', '~> 0.10'
   gem 'license_finder'
   gem 'git', '~> 1.4'
+  gem 'rb-readline'
+
 end
 
 # gems for Maintainers.md generation
