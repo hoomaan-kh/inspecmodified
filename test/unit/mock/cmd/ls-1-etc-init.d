@@ -1,0 +1,3 @@
+crond
+sshd
+apache2

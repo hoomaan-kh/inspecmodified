@@ -1,0 +1,9 @@
+{
+    "DisplayName":  "Windows Remote Management (WS-Management)",
+    "Caption":  "Windows Remote Management (WS-Management)",
+    "DesktopInteract":  false,
+    "Name":  "WinRM",
+    "StartMode":  "Auto",
+    "ExitCode":  0,
+    "Status":  "OK"
+}

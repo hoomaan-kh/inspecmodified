@@ -1,0 +1,10 @@
+name: vagrant
+driver:
+  customize:
+    memory: 1024
+platforms:
+  - linux
+  - mac
+:symbol_key: 123
+:symbol_key_deep:
+  foo: bar
