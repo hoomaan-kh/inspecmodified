@@ -1,18 +1,18 @@
 # encoding: utf-8
+# author: Joseph Benden
 
 module Inspec::Resources
   class ZfsPool < Inspec.resource(1)
     name 'zfs_pool'
-    supports platform: 'unix'
     desc "
       Use the zfs_pool InSpec audit resource to test if the named
       ZFS Pool is present and/or has certain properties.
     "
-    example <<~EXAMPLE
+    example "
       describe zfs_pool('tank') do
         its('failmode') { should eq('continue') }
       end
-    EXAMPLE
+    "
 
     def initialize(zfs_pool)
       return skip_resource 'The `zfs_pool` resource is not supported on your OS yet.' if !inspec.os.bsd?

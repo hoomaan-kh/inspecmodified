@@ -18,7 +18,7 @@ describe 'inspec exec with junit formatter' do
   it 'can execute the profile with the junit formatter' do
     out = inspec('exec ' + example_profile + ' --reporter junit --no-create-lockfile')
     out.stderr.must_equal ''
-    out.exit_status.must_equal 101
+    out.exit_status.must_equal 0
     doc = REXML::Document.new(out.stdout)
     doc.has_elements?.must_equal true
   end
@@ -59,11 +59,7 @@ describe 'inspec exec with junit formatter' do
         end
 
         it 'should be skipped' do
-          if is_windows?
-            first_gordon_test.elements.to_a('//skipped').length.must_equal 2
-          else
-            first_gordon_test.elements.to_a('//skipped').length.must_equal 1
-          end
+          first_gordon_test.elements.to_a('//skipped').length.must_equal 1
         end
       end
     end

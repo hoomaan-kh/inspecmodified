@@ -1,5 +1,6 @@
 # encoding: utf-8
 # copyright: 2015, Vulcano Security GmbH
+# author: Christoph Hartmann
 
 require 'json'
 
@@ -48,13 +49,12 @@ require 'json'
 module Inspec::Resources
   class RegistryKey < Inspec.resource(1)
     name 'registry_key'
-    supports platform: 'windows'
     desc 'Use the registry_key InSpec audit resource to test key values in the Microsoft Windows registry.'
-    example <<~EXAMPLE
+    example "
       describe registry_key('path\to\key') do
         its('name') { should eq 'value' }
       end
-    EXAMPLE
+    "
 
     def initialize(name, reg_key = nil)
       # if we have one parameter, we use it as name
@@ -163,11 +163,10 @@ module Inspec::Resources
         $properties = New-Object -Type PSObject
         $reg.Property | ForEach-Object {
             $key = $_
-            $keytype = $key
-            if ("(default)".Equals($key)) { $keytype = '' }
+            if ("(default)".Equals($key)) { $key = '' }
             $value = New-Object psobject -Property @{
-              "value" =  $(Get-ItemProperty ('Registry::' + $path)).$key;
-              "type"  = $reg.GetValueKind($keytype);
+              "value" =  $reg.GetValue($key);
+              "type"  = $reg.GetValueKind($key);
             }
             $properties | Add-Member NoteProperty $_ $value
         }
@@ -280,12 +279,18 @@ module Inspec::Resources
     end
   end
 
+  # for compatability with serverspec
+  # this is deprecated syntax and will be removed in future versions
   class WindowsRegistryKey < RegistryKey
     name 'windows_registry_key'
 
     def initialize(name)
-      Inspec.deprecate(:resource_windows_registry_key, 'The `windows_registry_key` resource is deprecated. Please use `registry_key` instead.')
+      deprecated
       super(name)
+    end
+
+    def deprecated
+      warn '[DEPRECATION] `windows_registry_key(reg_key)` is deprecated.  Please use `registry_key(\'path\to\key\')` instead.'
     end
   end
 end

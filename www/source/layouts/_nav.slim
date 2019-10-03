@@ -1,30 +1,33 @@
 
 
-nav#main-nav.shadow
+nav#main-nav 
   <progress value="0"></progress>
   
   #main-nav-ctas
     a.main-nav--logo href="/"
-      img src="/images/inspec-by-chef-logo.svg" onerror="this.src='/images/inspec-by-chef-logo.png'" alt="logo for InSpec"
+      img src="/images/inspec-by-chef-logo.svg" onerror="this.src='/images/inspec-by-chef-logo.png'"
       
     i.fa.fa-bars.main-nav--toggle.strict-right.mobile-show
       
+
     ul.main-nav--links
       li.main-nav--link
-        <a href="/tutorials" class="link #{'t-purple' if current_page.url == '/tutorials'}" <span class="main-nav--link-text">Tutorials</span>
+        <a href="/tutorials" class="#{'t-purple' if current_page.url == '/tutorials'}" <span class="main-nav--link-text">Tutorials</span>
         </a>
       li.main-nav--link
-        <a href="/docs" class="link #{'t-purple' if current_page.url == '/docs'}" <span class="main-nav--link-text">Docs</span>
+        <a href="/docs" class="#{'t-purple' if current_page.url == '/docs'}" <span class="main-nav--link-text">Docs</span>
         </a>
       li.main-nav--link
-        <a href="/community" class="link #{'t-purple' if current_page.url == '/community'}" <span class="main-nav--link-text">Community</span>
+        <a href="/community" class="#{'t-purple' if current_page.url == '/community'}" <span class="main-nav--link-text">Community</span>
         </a>
       li.main-nav--link
-        a.link href="https://github.com/chef/inspec"
-          i.fa.fa-github
+        a href="https://github.com/chef/inspec"
+          i.fa.fa-github-alt
           span.main-nav--link-text Github
-      li.nav-cta
-        a.button.btn-sm.btn-purple href="/downloads"
+      li.main-nav--link.nav-cta.hide-for-small-only
+        a.btn.try-demo href="/tutorial" Try the Demo
+      li.main-nav--link.nav-cta
+        a.btn href="/downloads"
           i.fa.fa-cloud-download
-          | Download
-
+          span.main-nav--link-text Download
+          

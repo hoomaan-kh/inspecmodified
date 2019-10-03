@@ -2,7 +2,7 @@
 
 module Inspec
   class Test
-    attr_accessor :qualifier, :matcher, :expectation, :skip, :negated, :variables, :only_if
+    attr_accessor :qualifier, :matcher, :expectation, :skip, :negated, :variables
     include RubyHelper
 
     def initialize
@@ -61,7 +61,6 @@ module Inspec
     end
 
     def rb_describe
-      only_if_clause = "only_if { #{only_if} }\n" if only_if
       vars = variables.map(&:to_ruby).join("\n")
       vars += "\n" unless vars.empty?
       res, xtra = describe_chain
@@ -75,8 +74,8 @@ module Inspec
               elsif xpect != ''
                 ' ' + expectation.inspect
               end
-      format("%s%sdescribe %s do\n  %s { should%s %s%s }\nend",
-             only_if_clause, vars, res, itsy, naughty, matcher, xpect)
+      format("%sdescribe %s do\n  %s { should%s %s%s }\nend",
+             vars, res, itsy, naughty, matcher, xpect)
     end
 
     def rb_skip

@@ -1,4 +1,6 @@
 # encoding: utf-8
+# author: Christoph Hartmann
+# author: Dominik Richter
 #
 # Security Configuration and Analysis
 #
@@ -67,9 +69,8 @@ module Inspec::Resources
 
   class SecurityPolicy < Inspec.resource(1)
     name 'security_policy'
-    supports platform: 'windows'
     desc 'Use the security_policy InSpec audit resource to test security policies on the Microsoft Windows platform.'
-    example <<~EXAMPLE
+    example "
       describe security_policy do
         its('SeNetworkLogonRight') { should include 'S-1-5-11' }
       end
@@ -77,7 +78,7 @@ module Inspec::Resources
       describe security_policy(translate_sid: true) do
         its('SeNetworkLogonRight') { should include 'NT AUTHORITY\\Authenticated Users' }
       end
-    EXAMPLE
+    "
 
     def initialize(opts = {})
       @translate_sid = opts[:translate_sid] || false

@@ -1,4 +1,7 @@
 # encoding: utf-8
+# author: Nolan Davidson
+# author: Christoph Hartmann
+# author: Dominik Richter
 
 require 'hashie/mash'
 require 'utils/database_helpers'
@@ -12,40 +15,32 @@ module Inspec::Resources
   #
   class OracledbSession < Inspec.resource(1)
     name 'oracledb_session'
-    supports platform: 'unix'
-    supports platform: 'windows'
     desc 'Use the oracledb_session InSpec resource to test commands against an Oracle database'
-    example <<~EXAMPLE
+    example "
       sql = oracledb_session(user: 'my_user', pass: 'password')
       describe sql.query(\"SELECT UPPER(VALUE) AS VALUE FROM V$PARAMETER WHERE UPPER(NAME)='AUDIT_SYS_OPERATIONS'\").row(0).column('value') do
         its('value') { should eq 'TRUE' }
       end
-    EXAMPLE
+    "
 
-    attr_reader :user, :password, :host, :service, :as_os_user, :as_db_role
-    # rubocop:disable Metrics/PerceivedComplexity,Metrics/CyclomaticComplexity
+    attr_reader :user, :password, :host, :service
     def initialize(opts = {})
       @user = opts[:user]
       @password = opts[:password] || opts[:pass]
       if opts[:pass]
-        Inspec.deprecate(:oracledb_session_pass_option, 'The oracledb_session `pass` option is deprecated. Please use `password`.')
+        warn '[DEPRECATED] use `password` option to supply password instead of `pass`'
       end
 
       @host = opts[:host] || 'localhost'
       @port = opts[:port] || '1521'
       @service = opts[:service]
 
-      # connection as sysdba stuff
-      return skip_resource "Option 'as_os_user' not available in Windows" if inspec.os.windows? && opts[:as_os_user]
-      @su_user = opts[:as_os_user]
-      @db_role = opts[:as_db_role]
-
       # we prefer sqlci although it is way slower than sqlplus, but it understands csv properly
-      @sqlcl_bin = 'sql' unless opts.key?(:sqlplus_bin) # don't use it if user specified sqlplus_bin option
+      @sqlcl_bin = 'sql'
       @sqlplus_bin = opts[:sqlplus_bin] || 'sqlplus'
 
-      return fail_resource "Can't run Oracle checks without authentication" if @su_user.nil? && (@user.nil? || @password.nil?)
-      return fail_resource 'You must provide a service name for the session' if @service.nil?
+      return skip_resource "Can't run Oracle checks without authentication" if @user.nil? || @password.nil?
+      return skip_resource 'You must provide a service name for the session' if @service.nil?
     end
 
     def query(q)
@@ -55,25 +50,19 @@ module Inspec::Resources
 
       p = nil
       # use sqlplus if sqlcl is not available
-      if @sqlcl_bin and inspec.command(@sqlcl_bin).exist?
+      if inspec.command(@sqlcl_bin).exist?
         bin = @sqlcl_bin
         opts = "set sqlformat csv\nSET FEEDBACK OFF"
         p = :parse_csv_result
       else
         bin = @sqlplus_bin
-        opts = "SET MARKUP HTML ON\nSET PAGESIZE 32000\nSET FEEDBACK OFF"
+        opts = "SET MARKUP HTML ON\nSET FEEDBACK OFF"
         p = :parse_html_result
       end
 
       query = verify_query(escaped_query)
       query += ';' unless query.end_with?(';')
-      if @db_role.nil?
-        command = %{#{bin} "#{@user}"/"#{@password}"@#{@host}:#{@port}/#{@service} <<EOC\n#{opts}\n#{query}\nEXIT\nEOC}
-      elsif @su_user.nil?
-        command = %{#{bin} "#{@user}"/"#{@password}"@#{@host}:#{@port}/#{@service} as #{@db_role} <<EOC\n#{opts}\n#{query}\nEXIT\nEOC}
-      else
-        command = %{su - #{@su_user} -c "env ORACLE_SID=#{@service} #{bin} / as #{@db_role} <<EOC\n#{opts}\n#{query}\nEXIT\nEOC"}
-      end
+      command = %{echo "#{opts}\n#{query}\nEXIT" | #{bin} "#{@user}"/"#{@password}"@#{@host}:#{@port}/#{@service}}
       cmd = inspec.command(command)
 
       out = cmd.stdout + "\n" + cmd.stderr

@@ -1,25 +1,24 @@
 # encoding: utf-8
 # copyright: 2015, Vulcano Security GmbH
+# author: Dominik Richter
+# author: Christoph Hartmann
+# author: Aaron Lippold
 
 require 'utils/simpleconfig'
 require 'utils/find_files'
-require 'utils/file_reader'
 require 'resources/postgres'
 
 module Inspec::Resources
   class PostgresConf < Inspec.resource(1)
     name 'postgres_conf'
-    supports platform: 'unix'
-    supports platform: 'windows'
     desc 'Use the postgres_conf InSpec audit resource to test the contents of the configuration file for PostgreSQL, typically located at /etc/postgresql/<version>/main/postgresql.conf or /var/lib/postgres/data/postgresql.conf, depending on the platform.'
-    example <<~EXAMPLE
+    example "
       describe postgres_conf do
         its('max_connections') { should eq '5' }
       end
-    EXAMPLE
+    "
 
     include FindFiles
-    include FileReader
     include ObjectTraverser
 
     def initialize(conf_path = nil)
@@ -70,6 +69,15 @@ module Inspec::Resources
       @content = ''
       @params = {}
 
+      # skip if the main configuration file doesn't exist
+      if !inspec.file(@conf_path).file?
+        return skip_resource "Can't find file \"#{@conf_path}\""
+      end
+      raw_conf = read_file(@conf_path)
+      if raw_conf.empty? && !inspec.file(@conf_path).empty?
+        return skip_resource("Can't read file \"#{@conf_path}\"")
+      end
+
       to_read = [@conf_path]
       until to_read.empty?
         base_dir = File.dirname(to_read[0])
@@ -108,7 +116,7 @@ module Inspec::Resources
     end
 
     def read_file(path)
-      @files_contents[path] ||= read_file_content(path)
+      @files_contents[path] ||= inspec.file(path).content
     end
   end
 end

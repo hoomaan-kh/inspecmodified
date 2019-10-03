@@ -5,34 +5,10 @@
 require 'thor'
 require 'inspec/log'
 require 'inspec/profile_vendor'
-require 'inspec/ui'
-
-# Allow end of options during array type parsing
-# https://github.com/erikhuda/thor/issues/631
-class Thor::Arguments
-  def parse_array(_name)
-    return shift if peek.is_a?(Array)
-    array = []
-    while current_is_value?
-      break unless @parsing_options
-      array << shift
-    end
-    array
-  end
-end
 
 module Inspec
   class BaseCLI < Thor
-    class << self
-      attr_accessor :inspec_cli_command
-    end
-
-    # https://github.com/erikhuda/thor/issues/244
-    def self.exit_on_failure?
-      true
-    end
-
-    def self.target_options # rubocop:disable MethodLength
+    def self.target_options
       option :target, aliases: :t, type: :string,
         desc: 'Simple targeting option using URIs, e.g. ssh://user:pass@host:port'
       option :backend, aliases: :b, type: :string,
@@ -45,8 +21,6 @@ module Inspec
         desc: 'The login user for a remote scan.'
       option :password, type: :string, lazy_default: -1,
         desc: 'Login password for a remote scan, if required.'
-      option :enable_password, type: :string, lazy_default: -1,
-        desc: 'Password for enable mode on Cisco IOS devices.'
       option :key_files, aliases: :i, type: :array,
         desc: 'Login key or certificate file for a remote scan.'
       option :path, type: :string,
@@ -69,132 +43,126 @@ module Inspec
         desc: 'Use SSL for transport layer encryption (WinRM).'
       option :self_signed, type: :boolean,
         desc: 'Allow remote scans with self-signed certificates (WinRM).'
-      option :winrm_transport, type: :string, default: 'negotiate',
-        desc: 'Specify which transport to use, defaults to negotiate (WinRM).'
-      option :winrm_disable_sspi, type: :boolean,
-        desc: 'Whether to use disable sspi authentication, defaults to false (WinRM).'
-      option :winrm_basic_auth, type: :boolean,
-        desc: 'Whether to use basic authentication, defaults to false (WinRM).'
-      option :config, type: :string,
+      option :json_config, type: :string,
         desc: 'Read configuration from JSON file (`-` reads from stdin).'
-      option :json_config, type: :string, hide: true
-      option :proxy_command, type: :string,
-        desc: 'Specifies the command to use to connect to the server'
-      option :bastion_host, type: :string,
-        desc: 'Specifies the bastion host if applicable'
-      option :bastion_user, type: :string,
-        desc: 'Specifies the bastion user if applicable'
-      option :bastion_port, type: :string,
-        desc: 'Specifies the bastion port if applicable'
-      option :insecure, type: :boolean, default: false,
-        desc: 'Disable SSL verification on select targets'
-      option :target_id, type: :string,
-        desc: 'Provide a ID which will be included on reports'
     end
 
     def self.profile_options
       option :profiles_path, type: :string,
         desc: 'Folder which contains referenced profiles.'
-      option :vendor_cache, type: :string,
-        desc: 'Use the given path for caching dependencies. (default: ~/.inspec/cache)'
     end
 
     def self.exec_options
       target_options
       profile_options
       option :controls, type: :array,
-        desc: 'A list of control names to run, or a list of /regexes/ to match against control names. Ignore all other tests.'
+        desc: 'A list of controls to run. Ignore all other tests.'
+      option :format, type: :string,
+        desc: '[DEPRECATED] Please use --reporter - this will be removed in InSpec 3.0'
       option :reporter, type: :array,
         banner: 'one two:/output/file/path',
-        desc: 'Enable one or more output reporters: cli, documentation, html, progress, json, json-min, json-rspec, junit, yaml'
-      option :input_file, type: :array,
-        desc: 'Load one or more input files, a YAML file with values for the profile to use'
+        desc: 'Enable one or more output reporters: cli, documentation, html, progress, json, json-min, json-rspec, junit'
+      option :color, type: :boolean,
+        desc: 'Use colors in output.'
       option :attrs, type: :array,
-        desc: 'Legacy name for --input-file - deprecated.'
+        desc: 'Load attributes file (experimental)'
+      option :cache, type: :string,
+        desc: '[DEPRECATED] Please use --vendor-cache - this will be removed in InSpec 2.0'
+      option :vendor_cache, type: :string,
+        desc: 'Use the given path for caching dependencies. (default: ~/.inspec/cache)'
       option :create_lockfile, type: :boolean,
         desc: 'Write out a lockfile based on this execution (unless one already exists)'
       option :backend_cache, type: :boolean,
-        desc: 'Allow caching for backend command output. (default: true)'
+        desc: 'Allow caching for backend command output.'
       option :show_progress, type: :boolean,
         desc: 'Show progress while executing tests.'
-      option :distinct_exit, type: :boolean, default: true,
-        desc: 'Exit with code 101 if any tests fail, and 100 if any are skipped (default).  If disabled, exit 0 on skips and 1 for failures.'
     end
 
-    def self.format_platform_info(params: {}, indent: 0, color: 39)
-      str = ''
-      params.each { |item, info|
-        data = info
-
-        # Format Array for better output if applicable
-        data = data.join(', ') if data.is_a?(Array)
-
-        # Do not output fields of data is missing ('unknown' is fine)
-        next if data.nil?
-
-        data = "\e[1m\e[#{color}m#{data}\e[0m"
-        str << format("#{' ' * indent}%-10s %s\n", item.to_s.capitalize + ':', data)
+    def self.default_options
+      {
+        exec: {
+          'reporter' => ['cli'],
+          'show_progress' => false,
+          'color' => true,
+          'create_lockfile' => true,
+          'backend_cache' => false,
+        },
+        shell: {
+          'reporter' => ['cli'],
+        },
       }
-      str
     end
 
-    # These need to be public methods on any BaseCLI instance,
-    # but Thor interprets all methods as subcommands.  The no_commands block
-    # treats them as regular methods.
-    no_commands do
-      def ui
-        return @ui if defined?(@ui)
+    def self.parse_reporters(opts)
+      # merge in any legacy formats as reporter
+      # this method will only be used for ad-hoc runners
+      if !opts['format'].nil? && opts['reporter'].nil?
+        warn '[DEPRECATED] The option --format is being is being deprecated and will be removed in inspec 3.0. Please use --reporter'
+        opts['reporter'] = Array(opts['format'])
+        opts.delete('format')
+      end
 
-        # Make a new UI object, respecting context
-        if options[:color].nil?
-          enable_color = true # If the command does not support the color option, default to on
-        else
-          enable_color = options[:color]
+      # parse out cli to proper report format
+      if opts['reporter'].is_a?(Array)
+        reports = {}
+        opts['reporter'].each do |report|
+          reporter_name, target = report.split(':')
+          if target.nil? || target.strip == '-'
+            reports[reporter_name] = { 'stdout' => true }
+          else
+            reports[reporter_name] = {
+              'file' => target,
+              'stdout' => false,
+            }
+          end
         end
-
-        # UI will probe for TTY if nil - just send the raw option value
-        enable_interactivity = options[:interactive]
-
-        @ui = Inspec::UI.new(color: enable_color, interactive: enable_interactivity)
+        opts['reporter'] = reports
       end
 
-      # Rationale: converting this to attr_writer breaks Thor
-      def ui=(new_ui) # rubocop: disable Style/TrivialAccessors
-        @ui = new_ui
+      # add in stdout if not specified
+      if opts['reporter'].is_a?(Hash)
+        opts['reporter'].each do |reporter_name, config|
+          opts['reporter'][reporter_name] = {} if config.nil?
+          opts['reporter'][reporter_name]['stdout'] = true if opts['reporter'][reporter_name].empty?
+        end
       end
 
-      def mark_text(text)
-        Inspec.deprecate(:inspec_ui_methods)
-        # Note that this one doesn't automatically print
-        ui.emphasis(text, print: false)
+      validate_reporters(opts['reporter'])
+      opts
+    end
+
+    def self.validate_reporters(reporters)
+      return if reporters.nil?
+
+      valid_types = [
+        'json',
+        'json-min',
+        'json-rspec',
+        'cli',
+        'junit',
+        'html',
+        'documentation',
+        'progress',
+      ]
+
+      reporters.each do |k, _v|
+        raise NotImplementedError, "'#{k}' is not a valid reporter type." unless valid_types.include?(k)
       end
 
-      def headline(title)
-        Inspec.deprecate(:inspec_ui_methods)
-        ui.headline(title)
+      # check to make sure we are only reporting one type to stdout
+      stdout = 0
+      reporters.each_value do |v|
+        stdout += 1 if v['stdout'] == true
       end
 
-      def li(entry)
-        Inspec.deprecate(:inspec_ui_methods)
-        ui.list_item(entry)
-      end
-
-      def plain_text(msg)
-        Inspec.deprecate(:inspec_ui_methods)
-        ui.plain(msg + "\n")
-      end
-
-      def exit(code)
-        Inspec.deprecate(:inspec_ui_methods)
-        ui.exit code
-      end
+      raise ArgumentError, 'The option --reporter can only have a single report outputting to stdout.' if stdout > 1
     end
 
     private
 
     def suppress_log_output?(opts)
       return false if opts['reporter'].nil?
-      match = %w{json json-min json-rspec json-automate junit html yaml documentation progress} & opts['reporter'].keys
+      match = %w{json json-min json-rspec junit html} & opts['reporter'].keys
       unless match.empty?
         match.each do |m|
           # check to see if we are outputting to stdout
@@ -204,12 +172,75 @@ module Inspec
       false
     end
 
-    def diagnose(_ = nil)
-      config.diagnose
+    def diagnose(opts)
+      return unless opts['diagnose']
+      puts "InSpec version: #{Inspec::VERSION}"
+      puts "Train version: #{Train::VERSION}"
+      puts 'Command line configuration:'
+      pp options
+      puts 'JSON configuration file:'
+      pp options_json
+      puts 'Merged configuration:'
+      pp opts
+      puts
     end
 
-    def config
-      @config ||= Inspec::Config.new(options) # 'options' here is CLI opts from Thor
+    def opts(type = nil)
+      o = merged_opts(type)
+
+      # Due to limitations in Thor it is not possible to set an argument to be
+      # both optional and its value to be mandatory. E.g. the user supplying
+      # the --password argument is optional and not always required, but
+      # whenever it is used, it requires a value. Handle options that were
+      # defined above and require a value here:
+      %w{password sudo-password}.each do |v|
+        id = v.tr('-', '_').to_sym
+        next unless o[id] == -1
+        raise ArgumentError, "Please provide a value for --#{v}. For example: --#{v}=hello."
+      end
+
+      o
+    end
+
+    def merged_opts(type = nil)
+      opts = {}
+      opts[:type] = type unless type.nil?
+
+      # start with default options if we have any
+      opts = BaseCLI.default_options[type] unless type.nil? || BaseCLI.default_options[type].nil?
+
+      # merge in any options from json-config
+      opts.merge!(options_json)
+
+      # remove the default reporter if we are setting a legacy format on the cli
+      opts.delete('reporter') if options['format']
+
+      # merge in any options defined via thor
+      opts.merge!(options)
+
+      # parse reporter options
+      opts = BaseCLI.parse_reporters(opts) if %i(exec shell).include?(type)
+
+      Thor::CoreExt::HashWithIndifferentAccess.new(opts)
+    end
+
+    def options_json
+      conffile = options['json_config']
+      @json ||= conffile ? read_config(conffile) : {}
+    end
+
+    def read_config(file)
+      if file == '-'
+        puts 'WARN: reading JSON config from standard input' if STDIN.tty?
+        config = STDIN.read
+      else
+        config = File.read(file)
+      end
+
+      JSON.parse(config)
+    rescue JSON::ParserError => e
+      puts "Failed to load JSON configuration: #{e}\nConfig was: #{config.inspect}"
+      exit 1
     end
 
     # get the log level
@@ -253,12 +284,12 @@ module Inspec
 
     def configure_logger(o)
       #
-      # TODO(ssd): This is a bit gross, but this configures the
+      # TODO(ssd): This is a big gross, but this configures the
       # logging singleton Inspec::Log. Eventually it would be nice to
       # move internal debug logging to use this logging singleton.
       #
-      loc = if o['log_location']
-              o['log_location']
+      loc = if o.log_location
+              o.log_location
             elsif suppress_log_output?(o)
               STDERR
             else
@@ -266,14 +297,26 @@ module Inspec
             end
 
       Inspec::Log.init(loc)
-      Inspec::Log.level = get_log_level(o['log_level'])
+      Inspec::Log.level = get_log_level(o.log_level)
 
-      o[:logger] = Logger.new(loc)
+      o[:logger] = Logger.new(STDOUT)
       # output json if we have activated the json formatter
       if o['log-format'] == 'json'
         o[:logger].formatter = Logger::JSONFormatter.new
       end
-      o[:logger].level = get_log_level(o['log_level'])
+      o[:logger].level = get_log_level(o.log_level)
+    end
+
+    def mark_text(text)
+      "\e[0;36m#{text}\e[0m"
+    end
+
+    def headline(title)
+      puts "\n== #{title}\n\n"
+    end
+
+    def li(entry)
+      puts " #{mark_text('*')} #{entry}"
     end
   end
 end

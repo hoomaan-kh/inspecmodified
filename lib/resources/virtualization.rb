@@ -1,13 +1,13 @@
 # encoding: utf-8
+# author: Takaaki Furukawa
 
 require 'hashie/mash'
 
 module Inspec::Resources
   class Virtualization < Inspec.resource(1)
     name 'virtualization'
-    supports platform: 'linux'
     desc 'Use the virtualization InSpec audit resource to test the virtualization platform on which the system is running'
-    example <<~EXAMPLE
+    example "
       describe virtualization do
         its('system') { should eq 'docker' }
       end
@@ -22,11 +22,14 @@ module Inspec::Resources
         end
         only_if { virtualization.system == 'docker' }
       end
-    EXAMPLE
+    "
 
     def initialize
-      @virtualization_data = Hashie::Mash.new
-      collect_data_linux
+      unless inspec.os.linux?
+        skip_resource 'The `virtualization` resource is not supported on your OS yet.'
+      else
+        collect_data_linux
+      end
     end
 
     # add helper methods for easy access of properties
@@ -67,15 +70,15 @@ module Inspec::Resources
     # - Additional edge cases likely should not change the above assumptions
     #   but rather be additive - btm
     def detect_xen
-      # This file should exist on most Xen systems, normally empty for guests
-      return false unless inspec.file('/proc/xen/capabilities').exist?
+      return false unless inspec.file('/proc/xen').exist?
       @virtualization_data[:system] = 'xen'
-      if inspec.file('/proc/xen/capabilities').content =~ /control_d/i
-        @virtualization_data[:role] = 'host'
-      else
-        @virtualization_data[:role] = 'guest'
-      end
+      @virtualization_data[:role] = 'guest'
 
+      # This file should exist on most Xen systems, normally empty for guests
+      if inspec.file('/proc/xen/capabilities').exist? &&
+          inspec.file('/proc/xen/capabilities').content =~ /control_d/i # rubocop:disable Layout/MultilineOperationIndentation
+        @virtualization_data[:role] = 'host'
+      end
       true
     end
 
@@ -226,7 +229,8 @@ module Inspec::Resources
     end
 
     def collect_data_linux # rubocop:disable Metrics/PerceivedComplexity, Metrics/CyclomaticComplexity
-      # This avoids doing multiple detections in a single test
+      # cache data in an instance var to avoid doing multiple detections for a single test
+      @virtualization_data ||= Hashie::Mash.new
       return unless @virtualization_data.empty?
 
       # each detect method will return true if it matched and was successfully

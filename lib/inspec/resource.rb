@@ -2,7 +2,7 @@
 # copyright: 2015, Vulcano Security GmbH
 # author: Dominik Richter
 # author: Christoph Hartmann
-require 'inspec/plugin/v1'
+require 'inspec/plugins'
 
 module Inspec
   class ProfileNotFound < StandardError; end
@@ -50,16 +50,8 @@ module Inspec
           define_method id.to_sym do |*args|
             r.new(backend, id.to_s, *args)
           end
-
-          # confirm backend custom resources have access to other custom resources
-          next if backend.respond_to?(id)
-          backend.class.send(:define_method, id.to_sym) do |*args|
-            r.new(backend, id.to_s, *args)
-          end
         end
 
-        # attach backend so we have access to all resources and
-        # the train connection object
         define_method :inspec do
           backend
         end
@@ -82,23 +74,6 @@ module Inspec
   end
 end
 
-# Many resources use FilterTable.
-require 'utils/filter'
-
-# Detect if we are running the stripped-down inspec-core
-# This relies on AWS being stripped from the inspec-core gem
-inspec_core_only = !File.exist?(File.join(File.dirname(__FILE__), '..', 'resource_support', 'aws.rb'))
-
-# Do not attempt to load cloud resources if we are in inspec-core mode
-unless inspec_core_only
-  require 'resource_support/aws'
-  require 'resources/azure/azure_backend.rb'
-  require 'resources/azure/azure_generic_resource.rb'
-  require 'resources/azure/azure_resource_group.rb'
-  require 'resources/azure/azure_virtual_machine.rb'
-  require 'resources/azure/azure_virtual_machine_data_disk.rb'
-end
-
 require 'resources/aide_conf'
 require 'resources/apache'
 require 'resources/apache_conf'
@@ -106,10 +81,10 @@ require 'resources/apt'
 require 'resources/audit_policy'
 require 'resources/auditd'
 require 'resources/auditd_conf'
+require 'resources/auditd_rules'
 require 'resources/bash'
 require 'resources/bond'
 require 'resources/bridge'
-require 'resources/chocolatey_package'
 require 'resources/command'
 require 'resources/cran'
 require 'resources/cpan'
@@ -119,7 +94,6 @@ require 'resources/directory'
 require 'resources/docker'
 require 'resources/docker_container'
 require 'resources/docker_image'
-require 'resources/docker_plugin'
 require 'resources/docker_service'
 require 'resources/elasticsearch'
 require 'resources/etc_fstab'
@@ -135,7 +109,6 @@ require 'resources/grub_conf'
 require 'resources/host'
 require 'resources/http'
 require 'resources/iis_app'
-require 'resources/iis_app_pool'
 require 'resources/iis_site'
 require 'resources/inetd_conf'
 require 'resources/interface'
@@ -144,7 +117,6 @@ require 'resources/json'
 require 'resources/kernel_module'
 require 'resources/kernel_parameter'
 require 'resources/key_rsa'
-require 'resources/ksh'
 require 'resources/limits_conf'
 require 'resources/login_def'
 require 'resources/mount'
@@ -176,7 +148,6 @@ require 'resources/powershell'
 require 'resources/processes'
 require 'resources/rabbitmq_conf'
 require 'resources/registry_key'
-require 'resources/security_identifier'
 require 'resources/security_policy'
 require 'resources/service'
 require 'resources/shadow'

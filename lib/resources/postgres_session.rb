@@ -1,5 +1,8 @@
 # encoding: utf-8
 # copyright: 2015, Vulcano Security GmbH
+# author: Dominik Richter
+# author: Christoph Hartmann
+# author: Aaron Lippold
 
 require 'shellwords'
 
@@ -23,10 +26,8 @@ module Inspec::Resources
 
   class PostgresSession < Inspec.resource(1)
     name 'postgres_session'
-    supports platform: 'unix'
-    supports platform: 'windows'
     desc 'Use the postgres_session InSpec audit resource to test SQL commands run against a PostgreSQL database.'
-    example <<~EXAMPLE
+    example "
       sql = postgres_session('username', 'password', 'host')
       query('sql_query', ['database_name'])` contains the query and (optional) database to execute
 
@@ -38,7 +39,7 @@ module Inspec::Resources
       describe sql.query('SELECT * FROM pg_shadow WHERE passwd IS NULL;') do
         its('output') { should eq '' }
       end
-    EXAMPLE
+    "
 
     def initialize(user, pass, host = nil)
       @user = user || 'postgres'

@@ -1,4 +1,6 @@
 # encoding: utf-8
+# author: Christoph Hartmann
+# author: Dominik Richter
 
 # Verifies apt and ppa repositories
 #
@@ -29,14 +31,13 @@ require 'uri'
 module Inspec::Resources
   class AptRepository < Inspec.resource(1)
     name 'apt'
-    supports platform: 'unix'
     desc 'Use the apt InSpec audit resource to verify Apt repositories on the Debian and Ubuntu platforms, and also PPA repositories on the Ubuntu platform.'
-    example <<~EXAMPLE
+    example "
       describe apt('nginx/stable') do
         it { should exist }
         it { should be_enabled }
       end
-    EXAMPLE
+    "
 
     def initialize(ppa_name)
       @deb_url = nil
@@ -127,6 +128,8 @@ module Inspec::Resources
     end
   end
 
+  # for compatability with serverspec
+  # this is deprecated syntax and will be removed in future versions
   class PpaRepository < AptRepository
     name 'ppa'
 
@@ -141,7 +144,7 @@ module Inspec::Resources
     end
 
     def deprecated
-      Inspec.deprecate(:resource_ppa, 'The `ppa` resource is deprecated. Please use `apt`')
+      warn '[DEPRECATION] `ppa(reponame)` is deprecated.  Please use `apt(reponame)` instead.'
     end
   end
 end

@@ -1,6 +1,5 @@
 ---
 title: About the packages Resource
-platform: linux
 ---
 
 # packages
@@ -8,16 +7,6 @@ platform: linux
 Use the `packages` InSpec audit resource to test the properties of multiple packages on the system.
 
 <br>
-
-## Availability
-
-### Installation
-
-This resource is distributed along with InSpec itself. You can use it automatically.
-
-### Version
-
-This resource first became available in v1.51.15 of InSpec.
 
 ## Syntax
 
@@ -35,19 +24,19 @@ The following examples show how to use this InSpec audit resource.
 
 ### Verify that no `xserver` packages are installed
 
-    describe packages(/xserver/) do
+    describe package(/xserver/) do
       its('statuses') { should_not cmp 'installed' }
     end
 
 ### Verify all `openssl` packages match a certain version
 
-    describe packages(/openssl/) do
+    describe package(/openssl/) do
       its('versions') { should cmp '1.0.1e-42.el7' }
     end
 
 ### Verify that both the `i686` and `x86_64` versions of `libgcc` are installed
 
-    describe packages(/libgcc/) do
+    describe package(/libgcc/) do
       its('architectures') { should include 'x86_64' }
       its('architectures') { should include 'i686' }
     end
@@ -56,7 +45,7 @@ The following examples show how to use this InSpec audit resource.
 
 ## Matchers
 
-For a full list of available matchers, please visit our [matchers page](https://www.inspec.io/docs/reference/matchers/).
+For a full list of available matchers please visit our [matchers page](https://www.inspec.io/docs/reference/matchers/). 
 
 ### statuses
 

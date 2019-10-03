@@ -10,7 +10,7 @@ module DatabaseHelper
     end
 
     def value
-      @row.nil? ? '' : @row[@name.downcase]
+      @row[@name.downcase]
     end
 
     def to_s
@@ -48,24 +48,22 @@ module DatabaseHelper
       @cmd.exit_status == 0 && @error.nil?
     end
 
-    def rows
-      @results
-    end
-
     def row(id)
       SQLRow.new(self, @results[id])
     end
 
-    def column(column)
-      result = []
-      @results.each do |row|
-        result << row[column]
-      end
-      result
-    end
-
     def size
       @results.size
+    end
+
+    def stdout
+      warn '[DEPRECATION] The `stdout` method is deprecated. Use `row` instead.'
+      @cmd.stdout
+    end
+
+    def stderr
+      warn '[DEPRECATION] The `stderr` method is deprecated. Use `successful?` instead.'
+      @cmd.stderr
     end
 
     def inspect

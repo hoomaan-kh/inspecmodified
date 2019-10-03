@@ -5,7 +5,6 @@
 
 require 'forwardable'
 require 'openssl'
-require 'inspec/input_registry'
 require 'inspec/polyfill'
 require 'inspec/cached_fetcher'
 require 'inspec/file_provider'
@@ -56,7 +55,7 @@ module Inspec
       file_provider = FileProvider.for_path(path)
       rp = file_provider.relative_provider
 
-      # copy embedded dependencies into global cache
+      # copy embedded dependecies into global cache
       copy_deps_into_cache(rp, opts) unless opts[:vendor_cache].nil?
 
       reader = Inspec::SourceReader.resolve(rp)
@@ -67,8 +66,7 @@ module Inspec
       new(reader, opts)
     end
 
-    def self.for_fetcher(fetcher, config)
-      opts = config.respond_to?(:final_options) ? config.final_options : config
+    def self.for_fetcher(fetcher, opts)
       opts[:vendor_cache] = opts[:vendor_cache] || Cache.new
       path, writable = fetcher.fetch
       for_path(path, opts.merge(target: fetcher.target, writable: writable))
@@ -81,7 +79,6 @@ module Inspec
     end
 
     attr_reader :source_reader, :backend, :runner_context, :check_mode
-    attr_accessor :parent_profile, :profile_name
     def_delegator :@source_reader, :tests
     def_delegator :@source_reader, :libraries
     def_delegator :@source_reader, :metadata
@@ -95,14 +92,11 @@ module Inspec
       @controls = options[:controls] || []
       @writable = options[:writable] || false
       @profile_id = options[:id]
-      @profile_name = options[:profile_name]
       @cache = options[:vendor_cache] || Cache.new
-      @input_values = options[:inputs]
+      @attr_values = options[:attributes]
       @tests_collected = false
       @libraries_loaded = false
       @check_mode = options[:check_mode] || false
-      @parent_profile = options[:parent_profile]
-      @legacy_profile_path = options[:profiles_path] || false
       Metadata.finalize(@source_reader.metadata, @profile_id, options)
 
       # if a backend has already been created, clone it so each profile has its own unique backend object
@@ -114,29 +108,13 @@ module Inspec
       #
       # This will cause issues if a profile attempts to load a file via `inspec.profile.file`
       train_options = options.reject { |k, _| k == 'target' } # See https://github.com/chef/inspec/pull/1646
-      @backend = options[:backend].nil? ? Inspec::Backend.create(Inspec::Config.new(train_options)) : options[:backend].dup
+      @backend = options[:backend].nil? ? Inspec::Backend.create(train_options) : options[:backend].dup
       @runtime_profile = RuntimeProfile.new(self)
       @backend.profile = @runtime_profile
 
       @runner_context =
         options[:profile_context] ||
-        Inspec::ProfileContext.for_profile(self, @backend, @input_values)
-
-      @supports_platform = metadata.supports_platform?(@backend)
-      @supports_runtime = metadata.supports_runtime?
-      register_metadata_inputs
-    end
-
-    def register_metadata_inputs # TODO: deprecate
-      if metadata.params.key?(:attributes) && metadata.params[:attributes].is_a?(Array)
-        metadata.params[:attributes].each do |attribute|
-          attr_dup = attribute.dup
-          name = attr_dup.delete(:name)
-          @runner_context.register_input(name, attr_dup)
-        end
-      elsif metadata.params.key?(:attributes)
-        Inspec::Log.warn 'Inputs must be defined as an Array. Skipping current definition.'
-      end
+        Inspec::ProfileContext.for_profile(self, @backend, @attr_values)
     end
 
     def name
@@ -161,16 +139,10 @@ module Inspec
       supports_platform? && supports_runtime?
     end
 
-    # We need to check if we're using a Mock'd backend for tests to function.
-    # @returns [TrueClass, FalseClass]
     def supports_platform?
       if @supports_platform.nil?
         @supports_platform = metadata.supports_platform?(@backend)
       end
-      if @backend.backend.class.to_s == 'Train::Transports::Mock::Connection'
-        @supports_platform = true
-      end
-
       @supports_platform
     end
 
@@ -186,8 +158,7 @@ module Inspec
     end
 
     def collect_tests(include_list = @controls)
-      unless @tests_collected
-        return unless supports_platform?
+      if !@tests_collected
         locked_dependencies.each(&:collect_tests)
 
         tests.each do |path, content|
@@ -202,50 +173,16 @@ module Inspec
 
     def filter_controls(controls_array, include_list)
       return controls_array if include_list.nil? || include_list.empty?
-
-      # Check for anything that might be a regex in the list, and make it official
-      include_list.each_with_index do |inclusion, index|
-        next if inclusion.is_a?(Regexp)
-        # Insist the user wrap the regex in slashes to demarcate it as a regex
-        next unless inclusion.start_with?('/') && inclusion.end_with?('/')
-        inclusion = inclusion[1..-2] # Trim slashes
-        begin
-          re = Regexp.new(inclusion)
-          include_list[index] = re
-        rescue RegexpError => e
-          warn "Ignoring unparseable regex '/#{inclusion}/' in --control CLI option: #{e.message}"
-          include_list[index] = nil
-        end
-      end
-      include_list.compact!
-
       controls_array.select do |c|
         id = ::Inspec::Rule.rule_id(c)
-        include_list.any? do |inclusion|
-          # Try to see if the inclusion is a regex, and if it matches
-          inclusion == id || (inclusion.is_a?(Regexp) && inclusion =~ id)
-        end
+        include_list.include?(id)
       end
     end
 
     def load_libraries
       return @runner_context if @libraries_loaded
 
-      locked_dependencies.dep_list.each_with_index do |(_name, dep), i|
-        d = dep.profile
-        # this will force a dependent profile load so we are only going to add
-        # this metadata if the parent profile is supported.
-        if supports_platform? && !d.supports_platform?
-          # since ruby 1.9 hashes are ordered so we can just use index values here
-          metadata.dependencies[i][:status] = 'skipped'
-          msg = "Skipping profile: '#{d.name}' on unsupported platform: '#{d.backend.platform.name}/#{d.backend.platform.release}'."
-          metadata.dependencies[i][:skip_message] = msg
-          next
-        elsif metadata.dependencies[i]
-          # Currently wrapper profiles will load all dependencies, and then we
-          # load them again when we dive down. This needs to be re-done.
-          metadata.dependencies[i][:status] = 'loaded'
-        end
+      locked_dependencies.each do |d|
         c = d.load_libraries
         @runner_context.add_resources(c)
       end
@@ -268,7 +205,7 @@ module Inspec
       info(load_params.dup)
     end
 
-    def info(res = params.dup) # rubocop:disable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity, Metrics/MethodLength
+    def info(res = params.dup)
       # add information about the controls
       res[:controls] = res[:controls].map do |id, rule|
         next if id.to_s.empty?
@@ -278,16 +215,6 @@ module Inspec
         data[:impact] = 1.0 if data[:impact] > 1.0
         data[:impact] = 0.0 if data[:impact] < 0.0
         data[:id] = id
-
-        # if the code field is empty try and pull info from dependencies
-        if data[:code].empty? && parent_profile.nil?
-          locked_dependencies.dep_list.each do |_name, dep|
-            profile = dep.profile
-            code = Inspec::MethodSource.code_at(data[:source_location], profile.source_reader)
-            data[:code] = code unless code.nil? || code.empty?
-            break if !data[:code].empty?
-          end
-        end
         data
       end.compact
 
@@ -297,32 +224,9 @@ module Inspec
         group
       end
 
-      # add information about the required inputs
-      if res[:inputs].nil? || res[:inputs].empty?
-        # convert to array for backwards compatability
-        res[:inputs] = []
-      else
-        res[:inputs] = res[:inputs].values.map(&:to_hash)
-      end
+      # add information about the required attributes
+      res[:attributes] = res[:attributes].map(&:to_hash) unless res[:attributes].nil? || res[:attributes].empty?
       res[:sha256] = sha256
-      res[:parent_profile] = parent_profile unless parent_profile.nil?
-
-      if !supports_platform?
-        res[:status] = 'skipped'
-        msg = "Skipping profile: '#{name}' on unsupported platform: '#{backend.platform.name}/#{backend.platform.release}'."
-        res[:skip_message] = msg
-      else
-        res[:status] = 'loaded'
-      end
-
-      # convert legacy os-* supports to their platform counterpart
-      if res[:supports] && !res[:supports].empty?
-        res[:supports].each do |support|
-          support[:"platform-family"] = support.delete(:"os-family") if support.key?(:"os-family")
-          support[:"platform-name"] = support.delete(:"os-name") if support.key?(:"os-name")
-        end
-      end
-
       res
     end
 
@@ -366,6 +270,9 @@ module Inspec
 
       @logger.info "Checking profile in #{@target}"
       meta_path = @source_reader.target.abs_path(@source_reader.metadata.ref)
+      if meta_path =~ /metadata\.rb$/
+        warn.call(@target, 0, 0, nil, 'The use of `metadata.rb` is deprecated. Use `inspec.yml`.')
+      end
 
       # verify metadata
       m_errors, m_warnings = metadata.valid
@@ -375,34 +282,14 @@ module Inspec
       m_unsupported.each { |u| warn.call(meta_path, 0, 0, nil, "doesn't support: #{u}") }
       @logger.info 'Metadata OK.' if m_errors.empty? && m_unsupported.empty?
 
-      # only run the vendor check if the legacy profile-path is not used as argument
-      if @legacy_profile_path == false
-        # verify that a lockfile is present if we have dependencies
-        if !metadata.dependencies.empty?
-          error.call(meta_path, 0, 0, nil, 'Your profile needs to be vendored with `inspec vendor`.') if !lockfile_exists?
-        end
-
-        if lockfile_exists?
-          # verify if metadata and lockfile are out of sync
-          if lockfile.deps.size != metadata.dependencies.size
-            error.call(meta_path, 0, 0, nil, 'inspec.yml and inspec.lock are out-of-sync. Please re-vendor with `inspec vendor`.')
-          end
-
-          # verify if metadata and lockfile have the same dependency names
-          metadata.dependencies.each { |dep|
-            # Skip if the dependency does not specify a name
-            next if dep[:name].nil?
-
-            # TODO: should we also verify that the soure is the same?
-            if !lockfile.deps.map { |x| x[:name] }.include? dep[:name]
-              error.call(meta_path, 0, 0, nil, "Cannot find #{dep[:name]} in lockfile. Please re-vendor with `inspec vendor`.")
-            end
-          }
-        end
-      end
-
       # extract profile name
       result[:summary][:profile] = metadata.params[:name]
+
+      # check if the profile is using the old test directory instead of the
+      # new controls directory
+      if @source_reader.tests.keys.any? { |x| x =~ %r{^test/$} }
+        warn.call(@target, 0, 0, nil, 'Profile uses deprecated `test` directory, rename it to `controls`.')
+      end
 
       count = controls_count
       result[:summary][:controls] = count
@@ -419,7 +306,7 @@ module Inspec
         error.call(sfile, sline, nil, id, 'Avoid controls with empty IDs') if id.nil? or id.empty?
         next if id.start_with? '(generated '
         warn.call(sfile, sline, nil, id, "Control #{id} has no title") if control[:title].to_s.empty?
-        warn.call(sfile, sline, nil, id, "Control #{id} has no descriptions") if control[:descriptions][:default].to_s.empty?
+        warn.call(sfile, sline, nil, id, "Control #{id} has no description") if control[:desc].to_s.empty?
         warn.call(sfile, sline, nil, id, "Control #{id} has impact > 1.0") if control[:impact].to_f > 1.0
         warn.call(sfile, sline, nil, id, "Control #{id} has impact < 0.0") if control[:impact].to_f < 0.0
         warn.call(sfile, sline, nil, id, "Control #{id} has no tests defined") if control[:checks].nil? or control[:checks].empty?
@@ -524,13 +411,7 @@ module Inspec
     end
 
     def load_dependencies
-      config = {
-        cwd: cwd,
-        cache: @cache,
-        backend: @backend,
-        parent_profile: name,
-      }
-      Inspec::DependencySet.from_lockfile(lockfile, config, { inputs: @input_values })
+      Inspec::DependencySet.from_lockfile(lockfile, cwd, @cache, @backend, { attributes: @attr_values })
     end
 
     # Calculate this profile's SHA256 checksum. Includes metadata, dependencies,
@@ -590,12 +471,12 @@ module Inspec
       params[:controls] = controls = {}
       params[:groups] = groups = {}
       prefix = @source_reader.target.prefix || ''
-      tests&.each do |rule|
+      tests.each do |rule|
         next if rule.nil?
         f = load_rule_filepath(prefix, rule)
         load_rule(rule, f, controls, groups)
       end
-      params[:inputs] = @runner_context.inputs
+      params[:attributes] = @runner_context.attributes
       params
     end
 
@@ -611,7 +492,6 @@ module Inspec
       controls[id] = {
         title: rule.title,
         desc: rule.desc,
-        descriptions: rule.descriptions,
         impact: rule.impact,
         refs: rule.ref,
         tags: rule.tag,
@@ -619,17 +499,6 @@ module Inspec
         code: Inspec::MethodSource.code_at(location, source_reader),
         source_location: location,
       }
-
-      # try and grab code text from merge locations
-      if controls[id][:code].empty? && Inspec::Rule.merge_count(rule) > 0
-        Inspec::Rule.merge_changes(rule).each do |merge_location|
-          code = Inspec::MethodSource.code_at(merge_location, source_reader)
-          if !code.empty?
-            controls[id][:code] = code
-            break
-          end
-        end
-      end
 
       groups[file] ||= {
         title: rule.instance_variable_get(:@__group_title),

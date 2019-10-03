@@ -1,12 +1,13 @@
 # encoding: utf-8
 # copyright: 2015, Vulcano Security GmbH
+# author: Christoph Hartmann
+# author: Dominik Richter
 
 module Inspec::Resources
   class Apache < Inspec.resource(1)
     name 'apache'
-    supports platform: 'unix'
     desc 'Use the apache InSpec audit resource to retrieve Apache environment settings.'
-    example <<~EXAMPLE
+    example "
       describe apache do
         its ('service') { should cmp 'apache2' }
       end
@@ -22,11 +23,11 @@ module Inspec::Resources
       describe apache do
         its ('user') { should cmp 'www-data' }
       end
-    EXAMPLE
+    "
 
     attr_reader :service, :conf_dir, :conf_path, :user
     def initialize
-      Inspec.deprecate(:resource_apache, 'The apache resource is deprecated')
+      warn '[DEPRECATED] The `apache` resource is deprecated and will be removed in InSpec 3.0.'
 
       if inspec.os.debian?
         @service = 'apache2'

@@ -6,9 +6,8 @@ require 'utils/filter'
 module Inspec::Resources
   class Crontab < Inspec.resource(1)
     name 'crontab'
-    supports platform: 'unix'
     desc 'Use the crontab InSpec audit resource to test the contents of the crontab for a given user which contains information about scheduled tasks owned by that user.'
-    example <<~EXAMPLE
+    example "
       describe crontab(user: 'root') do
         its('commands') { should include '/path/to/some/script' }
       end
@@ -29,7 +28,7 @@ module Inspec::Resources
       describe crontab(path: '/etc/cron.d/some_crontab') do
         its('commands') { should include '/path/to/some/script' }
       end
-    EXAMPLE
+    "
 
     attr_reader :params
 
@@ -41,21 +40,16 @@ module Inspec::Resources
         @user = opts.fetch(:user, nil)
         @path = opts.fetch(:path, nil)
         raise Inspec::Exceptions::ResourceFailed, 'A user or path must be supplied.' if @user.nil? && @path.nil?
-        raise Inspec::Exceptions::ResourceFailed, 'Either user or path must be supplied, not both!' if !@user.nil? && !@path.nil?
       else
         @user = opts
         @path = nil
       end
+      raise Inspec::Exceptions::ResourceSkipped, 'The `crontab` resource is not supported on your OS.' unless inspec.os.unix?
       @params = read_crontab
     end
 
     def read_crontab
-      if is_system_crontab?
-        raise Inspec::Exceptions::ResourceFailed, "Supplied crontab path '#{@path}' must exist!" if !inspec.file(@path).exist?
-        ct = inspec.file(@path).content
-      else
-        ct = inspec.command(crontab_cmd).stdout
-      end
+      ct = is_system_crontab? ? inspec.file(@path).content : inspec.command(crontab_cmd).stdout
       ct.lines.map { |l| parse_crontab_line(l) }.compact
     end
 
@@ -71,22 +65,24 @@ module Inspec::Resources
     end
 
     filter = FilterTable.create
-    filter.register_column(:minutes,  field: 'minute')
-          .register_column(:hours,    field: 'hour')
-          .register_column(:days,     field: 'day')
-          .register_column(:months,   field: 'month')
-          .register_column(:weekdays, field: 'weekday')
-          .register_column(:user,     field: 'user')
-          .register_column(:commands, field: 'command')
+    filter.add_accessor(:where)
+          .add_accessor(:entries)
+          .add(:minutes,  field: 'minute')
+          .add(:hours,    field: 'hour')
+          .add(:days,     field: 'day')
+          .add(:months,   field: 'month')
+          .add(:weekdays, field: 'weekday')
+          .add(:user,     field: 'user')
+          .add(:commands, field: 'command')
 
     # rebuild the crontab line from raw content
-    filter.register_custom_property(:content) { |t, _|
+    filter.add(:content) { |t, _|
       t.entries.map do |e|
         [e.minute, e.hour, e.day, e.month, e.weekday, e.user, e.command].compact.join(' ')
       end.join("\n")
     }
 
-    filter.install_filter_methods_on_resource(self, :params)
+    filter.connect(self, :params)
 
     def to_s
       if is_system_crontab?

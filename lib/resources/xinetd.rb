@@ -1,15 +1,15 @@
 # encoding: utf-8
+# author: Christoph Hartmann
+# author: Dominik Richter
 
 require 'utils/parser'
 require 'utils/filter'
-require 'utils/file_reader'
 
 module Inspec::Resources
   class XinetdConf < Inspec.resource(1)
     name 'xinetd_conf'
-    supports platform: 'unix'
     desc 'Xinetd services configuration.'
-    example <<~EXAMPLE
+    example "
       describe xinetd_conf.services('chargen') do
         its('socket_types') { should include 'dgram' }
       end
@@ -17,15 +17,13 @@ module Inspec::Resources
       describe xinetd_conf.services('chargen').socket_types('dgram') do
         it { should be_disabled }
       end
-    EXAMPLE
+    "
 
     include XinetdParser
-    include FileReader
 
     def initialize(conf_path = '/etc/xinetd.conf')
       @conf_path = conf_path
       @contents = {}
-      read_content(@conf_path)
     end
 
     def to_s
@@ -37,22 +35,32 @@ module Inspec::Resources
     end
 
     filter = FilterTable.create
-    filter.register_column(:services,     field: 'service')
-          .register_column(:ids,          field: 'id')
-          .register_column(:socket_types, field: 'socket_type')
-          .register_column(:types,        field: 'type')
-          .register_column(:protocols,    field: 'protocol')
-          .register_column(:wait,         field: 'wait')
-          .register_custom_matcher(:disabled?) { |x| x.where('disable' => 'no').services.empty? }
-          .register_custom_matcher(:enabled?) { |x| x.where('disable' => 'yes').services.empty? }
-          .install_filter_methods_on_resource(self, :service_lines)
+    filter.add_accessor(:where)
+          .add_accessor(:entries)
+          .add(:services,     field: 'service')
+          .add(:ids,          field: 'id')
+          .add(:socket_types, field: 'socket_type')
+          .add(:types,        field: 'type')
+          .add(:protocols,    field: 'protocol')
+          .add(:wait,         field: 'wait')
+          .add(:disabled?) { |x| x.where('disable' => 'no').services.empty? }
+          .add(:enabled?) { |x| x.where('disable' => 'yes').services.empty? }
+          .connect(self, :service_lines)
 
     private
 
     def read_content(path = @conf_path)
       return @contents[path] if @contents.key?(path)
+      file = inspec.file(path)
+      if !file.file?
+        raise Inspec::Exceptions::ResourceSkipped, "Can't find file: #{path}"
+      end
 
-      @contents[path] = read_file_content(path)
+      if file.content.nil? || file.content.empty?
+        raise Inspec::Exceptions::ResourceSkipped, "Can't read file: #{path}"
+      end
+
+      @contents[path] = file.content
     end
 
     def read_params

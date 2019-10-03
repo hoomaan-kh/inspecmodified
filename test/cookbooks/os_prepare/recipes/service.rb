@@ -1,3 +1,4 @@
+# encoding: utf-8
 # author: Christoph Hartmann
 # author: Dominik Richter
 #
@@ -6,6 +7,7 @@
 case node['platform']
 when 'ubuntu'
   # install ntp as a service
+  include_recipe 'apt::default'
   package 'ntp'
 
 when 'centos'

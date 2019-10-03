@@ -1,3 +1,4 @@
+# encoding: utf-8
 # author: Stephan Renatus
 
 case node['platform']

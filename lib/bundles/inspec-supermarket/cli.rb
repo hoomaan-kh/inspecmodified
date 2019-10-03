@@ -1,7 +1,6 @@
 # encoding: utf-8
 # author: Christoph Hartmann
 # author: Dominik Richter
-require 'inspec/base_cli'
 
 module Supermarket
   class SupermarketCLI < Inspec::BaseCLI
@@ -30,20 +29,12 @@ module Supermarket
     desc 'exec PROFILE', 'execute a Supermarket profile'
     exec_options
     def exec(*tests)
-      o = config
-      diagnose(o)
-      configure_logger(o)
-
       # iterate over tests and add compliance scheme
       tests = tests.map { |t| 'supermarket://' + t }
 
-      runner = Inspec::Runner.new(o)
-      tests.each { |target| runner.add_target(target) }
-
-      exit runner.run
-    rescue ArgumentError, RuntimeError, Train::UserError => e
-      $stderr.puts e.message
-      exit 1
+      # execute profile from inspec exec implementation
+      diagnose
+      run_tests(tests, opts)
     end
 
     desc 'info PROFILE', 'display Supermarket profile details'
@@ -69,6 +60,6 @@ module Supermarket
     end
   end
 
-  # register the subcommand to InSpec CLI registry
+  # register the subcommand to Inspec CLI registry
   Inspec::Plugins::CLI.add_subcommand(SupermarketCLI, 'supermarket', 'supermarket SUBCOMMAND ...', 'Supermarket commands', {})
 end

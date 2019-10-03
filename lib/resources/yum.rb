@@ -1,4 +1,6 @@
 # encoding: utf-8
+# author: Christoph Hartmann
+# author: Dominik Richter
 
 # Usage:
 # describe yum do
@@ -30,14 +32,13 @@
 module Inspec::Resources
   class Yum < Inspec.resource(1)
     name 'yum'
-    supports platform: 'unix'
     desc 'Use the yum InSpec audit resource to test the configuration of Yum repositories.'
-    example <<~EXAMPLE
+    example "
       describe yum.repo('name') do
         it { should exist }
         it { should be_enabled }
       end
-    EXAMPLE
+    "
 
     # returns all repositories
     # works as following:
@@ -150,6 +151,31 @@ module Inspec::Resources
 
     def to_s
       "YumRepo #{@reponame}"
+    end
+  end
+
+  # for compatability with serverspec
+  # this is deprecated syntax and will be removed in future versions
+  class YumRepoLegacy < Yum
+    name 'yumrepo'
+
+    def initialize(name)
+      super()
+      @repository = repo(name)
+    end
+
+    def exists?
+      deprecated
+      @repository.exist?
+    end
+
+    def enabled?
+      deprecated
+      @repository.enabled?
+    end
+
+    def deprecated
+      warn '[DEPRECATION] `yumrepo(reponame)` is deprecated.  Please use `yum.repo(reponame)` instead.'
     end
   end
 end

@@ -1,6 +1,5 @@
 ---
 title: About the interface Resource
-platform: os
 ---
 
 # interface
@@ -11,16 +10,6 @@ Use the `interface` InSpec audit resource to test basic network adapter properti
 * On the Windows platform, the `Get-NetAdapter` cmdlet is used as source
 
 <br>
-
-## Availability
-
-### Installation
-
-This resource is distributed along with InSpec itself. You can use it automatically.
-
-### Version
-
-This resource first became available in v1.0.0 of InSpec.
 
 ## Syntax
 
@@ -34,13 +23,15 @@ An `interface` resource block declares network interface properties to be tested
 
 <br>
 
-## Properties
+## Matchers
 
-`name`, `speed`
+For a full list of available matchers please visit our [matchers page](https://www.inspec.io/docs/reference/matchers/). 
 
-<br>
+### be_up
 
-## Resource Property Examples
+The `be_up` matcher tests if the network interface is available:
+
+    it { should be_up }
 
 ### name
 
@@ -53,16 +44,3 @@ The `name` matcher tests if the named network interface exists:
 The `speed` matcher tests the speed of the network interface, in MB/sec:
 
     its('speed') { should eq 1000 }
-
-<br>
-
-## Matchers
-
-For a full list of available matchers, please visit our [matchers page](https://www.inspec.io/docs/reference/matchers/).
-
-### be_up
-
-The `be_up` matcher tests if the network interface is available:
-
-    it { should be_up }
-

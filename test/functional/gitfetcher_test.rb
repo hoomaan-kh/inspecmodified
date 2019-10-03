@@ -1,7 +1,6 @@
 require 'functional/helper'
 require 'fileutils'
 require 'tmpdir'
-require 'yaml'
 
 describe 'profiles with git-based dependencies' do
   include FunctionalHelper
@@ -18,22 +17,19 @@ describe 'profiles with git-based dependencies' do
     Dir.chdir(@git_dep_dir) do
       CMD.run_command("git init")
       CMD.run_command("git add .")
-      CMD.run_command("git config user.name \"test\"")
-      CMD.run_command("git config user.email \"test@yahoo.com\"")
-      CMD.run_command("git commit -m \"initial commit\" --no-gpg-sign")
-      CMD.run_command("git commit -m \"another commit\" --allow-empty --no-gpg-sign")
+      CMD.run_command("git commit -m 'initial commit' --no-gpg-sign")
+      CMD.run_command("git commit -m 'another commit' --allow-empty --no-gpg-sign")
       CMD.run_command("git tag antag")
     end
 
-    inspec_yml = YAML.load(File.read(File.join(@profile_dir, "inspec.yml")))
-    inspec_yml["depends"] = [
-      {
-        'name' => 'git-dep',
-        'git' => @git_dep_dir,
-        'tag' => 'antag'
-      }
-    ]
-    File.write(File.join(@profile_dir, "inspec.yml"), YAML.dump(inspec_yml))
+    File.open(File.join(@profile_dir, "inspec.yml"), 'a') do |f|
+      f.write <<EOF
+depends:
+  - name: git-dep
+    git: #{@git_dep_dir}
+    tag: antag
+EOF
+    end
   end
 
   after(:all) do

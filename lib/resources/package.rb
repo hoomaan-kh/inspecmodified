@@ -1,4 +1,6 @@
 # encoding: utf-8
+# author: Christoph Hartmann
+# author: Dominik Richter
 
 # Resource to determine package information
 #
@@ -9,17 +11,16 @@
 module Inspec::Resources
   class Package < Inspec.resource(1)
     name 'package'
-    supports platform: 'unix'
-    supports platform: 'windows'
     desc 'Use the package InSpec audit resource to test if the named package and/or package version is installed on the system.'
-    example <<~EXAMPLE
+    example "
       describe package('nginx') do
         it { should be_installed }
         it { should_not be_held } # for dpkg platforms that support holding a version from being upgraded
         its('version') { should eq 1.9.5 }
       end
-    EXAMPLE
-    def initialize(package_name, opts = {}) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
+    "
+
+    def initialize(package_name, opts = {}) # rubocop:disable Metrics/AbcSize
       @package_name = package_name
       @name = @package_name
       @cache = nil
@@ -35,7 +36,7 @@ module Inspec::Resources
         @pkgman = Pacman.new(inspec)
       elsif ['darwin'].include?(os[:family])
         @pkgman = Brew.new(inspec)
-      elsif os.windows?
+      elsif inspec.os.windows?
         @pkgman = WindowsPkg.new(inspec)
       elsif ['aix'].include?(os[:family])
         @pkgman = BffPkg.new(inspec)
@@ -43,8 +44,6 @@ module Inspec::Resources
         @pkgman = SolarisPkg.new(inspec)
       elsif ['hpux'].include?(os[:family])
         @pkgman = HpuxPkg.new(inspec)
-      elsif ['alpine'].include?(os[:name])
-        @pkgman = AlpinePkg.new(inspec)
       else
         raise Inspec::Exceptions::ResourceSkipped, 'The `package` resource is not supported on your OS yet.'
       end
@@ -182,7 +181,7 @@ module Inspec::Resources
 
     def rpm_command(package_name)
       cmd = ''
-      cmd += 'rpm -qi'
+      cmd += 'rpm -qia'
       cmd += " --dbpath #{@dbpath}" if @dbpath
       cmd += ' ' + package_name
 
@@ -195,16 +194,9 @@ module Inspec::Resources
     def info(package_name)
       brew_path = inspec.command('brew').exist? ? 'brew' : '/usr/local/bin/brew'
       cmd = inspec.command("#{brew_path} info --json=v1 #{package_name}")
-
-      # If no available formula exists, then `brew` will exit non-zero
       return {} if cmd.exit_status.to_i != 0
-
+      # parse data
       pkg = JSON.parse(cmd.stdout)[0]
-
-      # If package exists but is not installed, then `brew` output will not
-      # contain `pkg['installed'][0]['version']
-      return {} unless pkg.dig('installed', 0, 'version')
-
       {
         name: pkg['name'],
         installed: true,
@@ -253,23 +245,6 @@ module Inspec::Resources
     end
   end
 
-  class AlpinePkg < PkgManagement
-    def info(package_name)
-      cmd = inspec.command("apk info -vv --no-network | grep #{package_name}")
-      return {} if cmd.exit_status.to_i != 0
-
-      pkg_info = cmd.stdout.split("\n").delete_if { |e| e =~ /^WARNING/i }
-      pkg = pkg_info[0].split(' - ')[0]
-
-      {
-        name: pkg.partition('-')[0],
-        installed: true,
-        version: pkg.partition('-')[2],
-        type: 'pkg',
-      }
-    end
-  end
-
   # Determines the installed packages on Windows using the Windows package registry entries.
   # @see: http://blogs.technet.com/b/heyscriptingguy/archive/2013/11/15/use-powershell-to-find-installed-software.aspx
   class WindowsPkg < PkgManagement
@@ -288,15 +263,9 @@ module Inspec::Resources
       # Find the package
       cmd = inspec.command <<-EOF.gsub(/^\s*/, '')
         Get-ItemProperty (@("#{search_paths.join('", "')}") | Where-Object { Test-Path $_ }) |
-        Where-Object { $_.DisplayName -match "^\s*#{package_name.shellescape}\.*" -or $_.PSChildName -match "^\s*#{package_name.shellescape}\.*" } |
+        Where-Object { $_.DisplayName -like "#{package_name}" -or $_.PSChildName -like "#{package_name}" } |
         Select-Object -Property DisplayName,DisplayVersion | ConvertTo-Json
       EOF
-
-      # We cannot rely on `exit_status` since PowerShell always exits 0 from the
-      # above command. Instead, if no package is found the output of the command
-      # will be `''` so we can use that to return `{}` to match the behavior of
-      # other package managers.
-      return {} if cmd.stdout == ''
 
       begin
         package = JSON.parse(cmd.stdout)

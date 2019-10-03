@@ -1,6 +1,8 @@
+# encoding: utf-8
 # author: Christoph Hartmann
 
-if platform_family?('rhel', 'debian', 'fedora')
+case node['platform']
+when 'ubuntu', 'rhel', 'centos', 'fedora'
   docker_service 'default' do
     action [:create, :start]
   end

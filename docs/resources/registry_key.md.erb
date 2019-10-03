@@ -1,6 +1,5 @@
 ---
 title: About the registry_key Resource
-platform: windows
 ---
 
 # registry_key
@@ -8,16 +7,6 @@ platform: windows
 Use the `registry_key` InSpec audit resource to test key values in the Windows registry.
 
 <br>
-
-## Availability
-
-### Installation
-
-This resource is distributed along with InSpec itself. You can use it automatically.
-
-### Version
-
-This resource first became available in v1.0.0 of InSpec.
 
 ## Syntax
 
@@ -52,7 +41,7 @@ A Windows registry key can be used as a string in Ruby code, such as when a regi
 
     HKCU\SOFTWARE\Policies\Microsoft\Windows\CurrentVersion\Themes
 
-may be enclosed in a single-quoted string with a single backslash:
+may be encloused in a single-quoted string with a single backslash:
 
     'HKCU\SOFTWARE\path\to\key\Themes'
 
@@ -101,7 +90,7 @@ where `'HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\services\Schedule'` is the f
 
 ## Matchers
 
-For a full list of available matchers, please visit our [matchers page](https://www.inspec.io/docs/reference/matchers/).
+For a full list of available matchers please visit our [matchers page](https://www.inspec.io/docs/reference/matchers/). 
 
 ### children
 
@@ -159,39 +148,10 @@ The `name` matcher tests the value for the specified registry setting:
 
 
 <p class="warning">
-Any name with a dot will not work as expected: <code>its('explorer.exe') { should eq 'test' }</code>. For details, see <a href="https://github.com/inspec/inspec/issues/1281">https://github.com/inspec/inspec/issues/1281</a>
+Any name with a dot will not work as expected: <code>its('explorer.exe') { should eq 'test' }</code>. This issue is tracked in <a href="https://github.com/chef/inspec/issues/1281">https://github.com/chef/inspec/issues/1281</a>
 </p>
 
     # instead of:
     # its('explorer.exe') { should eq 'test' }
-    # either use have_property_value...
+    # use the following solution:
     it { should have_property_value('explorer.exe', :string, 'test') }
-
-    # ...or provide the name in an array
-    its(['explorer.exe']) { should eq 'test' }
-
-The latter workaround may be preferable because upon failure, InSpec will present the expected and actual values:
-
-    inspec> describe registry_key('HKEY_USERS\S-1-5-20\Software\Policies\Microsoft\Windows\Control Panel\Desktop') do
-    inspec>   its(["SCRNSAVE.EXE"]) { should eq "FlyingToasters.scr" }
-    inspec> end
-
-    Profile: inspec-shell
-    Version: (not specified)
-
-      Registry Key HKEY_USERS\S-1-5-20\Software\Policies\Microsoft\Windows\Control Panel\Desktop
-         ×  ["SCRNSAVE.EXE"] should eq "FlyingToasters.scr"
-
-         expected: "FlyingToasters.scr"
-              got: "scrnsave.scr"
-
-         (compared using ==)
-
-
-    Test Summary: 0 successful, 1 failure, 0 skipped
-
-`have_property_value` only presents a false assertion:
-
-      Registry Key HKEY_USERS\S-1-5-20\Software\Policies\Microsoft\Windows\Control Panel\Desktop
-         ×  should have property value "SCRNSAVE.EXE", "FlyingToasters.scr"
-         expected #has_property_value?("SCRNSAVE.EXE", "FlyingToasters.scr") to return true, got false

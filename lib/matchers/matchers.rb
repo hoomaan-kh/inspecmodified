@@ -66,6 +66,25 @@ RSpec::Matchers.define :be_executable do
   end
 end
 
+# matcher to check /etc/passwd, /etc/shadow and /etc/group
+RSpec::Matchers.define :contain_legacy_plus do
+  match do |file|
+    warn '[DEPRECATION] `contain_legacy_plus` is deprecated and will be removed in the next major version. Please use `describe file(\'/etc/passwd\') do its(\'content\') { should_not match /^\+:/ } end`'
+    file.content =~ /^\+:/
+  end
+end
+
+# verifies that no entry in an array contains a value
+RSpec::Matchers.define :contain_match do |regex|
+  match do |arr|
+    warn '[DEPRECATION] `contain_match` is deprecated and will be removed in the next major version. See https://github.com/chef/inspec/issues/738 for more details'
+    arr.inject { |result, i|
+      result = i.match(regex)
+      result || i.match(/$/)
+    }
+  end
+end
+
 RSpec::Matchers.define :contain_duplicates do
   match do |arr|
     dup = arr.select { |element| arr.count(element) > 1 }
@@ -85,6 +104,11 @@ RSpec::Matchers.define :be_installed do
 
   chain :by do
     raise "[UNSUPPORTED] Please use the new resources 'gem', 'npm' or 'pip'."
+  end
+
+  chain :with_version do |version|
+    warn "[DEPRECATION] `with_version` is deprecated.  Please use `its('version') { should eq '1.4.1' }` instead."
+    @version = version
   end
 end
 
@@ -107,7 +131,6 @@ end
 # Deprecated: You should not use this matcher anymore
 RSpec::Matchers.define :be_running do
   match do |service|
-    Inspec.deprecate(:serverspec_compatibility, 'The service `be_running?` matcher is deprecated.')
     service.running? == true
   end
 
@@ -117,6 +140,32 @@ RSpec::Matchers.define :be_running do
 
   failure_message do |service|
     "expected that `#{service}` is running"
+  end
+end
+
+# user resource matcher for serverspec compatibility
+# Deprecated: You should not use this matcher anymore
+RSpec::Matchers.define :belong_to_group do |compare_group|
+  match do |user|
+    warn "[DEPRECATION] `belong_to_group` is deprecated.  Please use `its('groups') { should include('root') }` instead."
+    user.groups.include?(compare_group)
+  end
+
+  failure_message do |group|
+    "expected that the user belongs to group `#{group}`"
+  end
+end
+
+# user resource matcher for serverspec compatibility
+# Deprecated: You should not use this matcher anymore
+RSpec::Matchers.define :belong_to_primary_group do |compare_group|
+  match do |user|
+    warn "[DEPRECATION] `belong_to_primary_group` is deprecated.  Please use `its('group') { should eq 'root' }` instead."
+    user.group == compare_group
+  end
+
+  failure_message do |group|
+    "expected that the user belongs to primary group `#{group}`"
   end
 end
 
@@ -162,6 +211,14 @@ RSpec::Matchers.define :have_rule do |rule|
 
   chain :with_chain do |_chain|
     raise "[UNSUPPORTED] `with_table` is not supported in combination with `with_chain`. Please use the following syntax `iptables(table:'mangle', chain: 'input')`."
+  end
+end
+
+# deprecated
+RSpec::Matchers.define :contain do |rule|
+  match do |resource|
+    warn "[DEPRECATION] `contain` matcher. Please use the following syntax `its('content') { should include('value') }`."
+    expect(resource).to include(rule)
   end
 end
 
@@ -212,7 +269,7 @@ end
 RSpec::Matchers.define :cmp do |first_expected| # rubocop:disable Metrics/BlockLength
 
   def integer?(value)
-    !(value =~ /\A-?0+\Z|\A-?[1-9]\d*\Z/).nil?
+    !(value =~ /\A0+\Z|\A[1-9]\d*\Z/).nil?
   end
 
   def float?(value)
@@ -295,13 +352,13 @@ RSpec::Matchers.define :cmp do |first_expected| # rubocop:disable Metrics/BlockL
   end
 
   failure_message do |actual|
-    actual = ('0' + actual.to_s(8)) if octal?(@expected)
-    "\n" + format_expectation(false) + "\n     got: #{actual.inspect}\n\n(compared using `cmp` matcher)\n"
+    actual = ('0' + actual.to_s(8)).inspect if octal?(@expected)
+    "\n" + format_expectation(false) + "\n     got: #{actual}\n\n(compared using `cmp` matcher)\n"
   end
 
   failure_message_when_negated do |actual|
     actual = ('0' + actual.to_s(8)).inspect if octal?(@expected)
-    "\n" + format_expectation(true) + "\n     got: #{actual.inspect}\n\n(compared using `cmp` matcher)\n"
+    "\n" + format_expectation(true) + "\n     got: #{actual}\n\n(compared using `cmp` matcher)\n"
   end
 
   description do

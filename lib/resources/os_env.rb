@@ -1,5 +1,7 @@
 # encoding: utf-8
 # copyright: 2015, Vulcano Security GmbH
+# author: Christoph Hartmann
+# author: Dominik Richter
 
 # Usage:
 #
@@ -13,24 +15,16 @@ require 'utils/simpleconfig'
 module Inspec::Resources
   class OsEnv < Inspec.resource(1)
     name 'os_env'
-    supports platform: 'unix'
-    supports platform: 'windows'
     desc 'Use the os_env InSpec audit resource to test the environment variables for the platform on which the system is running.'
-    example <<~EXAMPLE
+    example "
       describe os_env('VARIABLE') do
         its('matcher') { should eq 1 }
       end
-    EXAMPLE
+    "
 
-    def initialize(env = nil, target = nil)
+    attr_reader :content
+    def initialize(env = nil)
       @osenv = env
-      @target = unless target.nil?
-                  if target.casecmp('system') == 0
-                    'Machine'
-                  else
-                    'User'
-                  end
-                end
     end
 
     def split
@@ -44,7 +38,7 @@ module Inspec::Resources
 
     def content
       return @content if defined?(@content)
-      @content = value_for(@osenv, @target) unless @osenv.nil?
+      @content = value_for(@osenv) unless @osenv.nil?
     end
 
     def to_s
@@ -57,13 +51,9 @@ module Inspec::Resources
 
     private
 
-    def value_for(env, target = nil)
+    def value_for(env)
       command = if inspec.os.windows?
-                  if target.nil?
-                    "${Env:#{env}}"
-                  else
-                    "[System.Environment]::GetEnvironmentVariable('#{env}', [System.EnvironmentVariableTarget]::#{target})"
-                  end
+                  "${Env:#{env}}"
                 else
                   'env'
                 end

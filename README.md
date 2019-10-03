@@ -1,8 +1,8 @@
 # InSpec: Inspect Your Infrastructure
 
 [![Slack](https://community-slack.chef.io/badge.svg)](https://community-slack.chef.io/)
-[![Build Status Master](https://travis-ci.org/inspec/inspec.svg?branch=master)](https://travis-ci.org/inspec/inspec)
-[![Build Status Master](https://ci.appveyor.com/api/projects/status/github/inspec/inspec?branch=master&svg=true&passingText=master%20-%20Ok&pendingText=master%20-%20Pending&failingText=master%20-%20Failing)](https://ci.appveyor.com/project/Chef/inspec/branch/master)
+[![Build Status Master](https://travis-ci.org/chef/inspec.svg?branch=master)](https://travis-ci.org/chef/inspec)
+[![Build Status Master](https://ci.appveyor.com/api/projects/status/github/chef/inspec?branch=master&svg=true&passingText=master%20-%20Ok&pendingText=master%20-%20Pending&failingText=master%20-%20Failing)](https://ci.appveyor.com/project/Chef/inspec/branch/master)
 
 InSpec is an open-source testing framework for infrastructure with a human- and machine-readable language for specifying compliance, security and policy requirements.
 
@@ -46,7 +46,7 @@ inspec exec test.rb -t docker://container_id
 
 ## Installation
 
-InSpec requires Ruby ( >2.3 ).
+InSpec requires Ruby ( >1.9 ).
 
 ### Install as package
 
@@ -67,13 +67,13 @@ When installing from source, gem dependencies may require ruby build tools to be
 For CentOS/RedHat/Fedora:
 
 ```bash
-yum -y install ruby ruby-devel make gcc gcc-c++
+yum -y install ruby ruby-devel make gcc
 ```
 
 For Ubuntu:
 
 ```bash
-apt-get -y install ruby ruby-dev gcc g++ make
+apt-get -y install ruby ruby-dev gcc make
 ```
 
 To install inspec from [rubygems](https://rubygems.org/):
@@ -84,28 +84,20 @@ gem install inspec
 
 ### Usage via Docker
 
-Download the image and define a function for convenience:
-
-For Linux:
+Download the image and define an alias for convenience:
 
 ```
 docker pull chef/inspec
-function inspec { docker run -it --rm -v $(pwd):/share chef/inspec "$@"; }
+alias inspec='docker run -it --rm -v $(pwd):/share chef/inspec'
 ```
 
-For Windows (PowerShell):
-
-```
-docker pull chef/inspec
-function inspec { docker run -it --rm -v "$(pwd):/share" chef/inspec $args; }
-```
-
-If you call `inspec` from your shell, it automatically mounts the current directory into the Docker container. Therefore you can easily use local tests and key files. Note: Only files in the current directory and sub-directories are available within the container.
+If you call inspec from cli, it automatically mounts the current directory into the work directory. Therefore you can easily use local tests and key files. Note: Only files in the current directory are available to the container.
 
 ```
 $ ls -1
 vagrant
 test.rb
+
 
 $ inspec exec test.rb -t ssh://root@192.168.64.2:11022 -i vagrant
 ..
@@ -116,8 +108,6 @@ Finished in 0.04321 seconds (files took 0.54917 seconds to load)
 
 
 ### Install it from source
-
-Note that installing from OS packages from [the download page](https://downloads.chef.io) is the preferred method.
 
 That requires [bundler](http://bundler.io/):
 
@@ -142,7 +132,8 @@ Currently, this method of installation only supports Linux. See the [Habitat sit
 Download the `hab` binary from the [Habitat](https://www.habitat.sh/docs/get-habitat/) site.
 
 ```bash
-hab pkg install chef/inspec --binlink
+hab pkg install chef/inspec
+export PATH="$(hab pkg path core/ruby)/bin:$(hab pkg path chef/inspec)/bin:$PATH"
 
 inspec
 ```
@@ -194,7 +185,7 @@ end
 ```
 
 * Test your `kitchen.yml` file to verify that only Vagrant is configured as the driver.  The %w() formatting will
-pass rubocop linting and allow you to access nested mappings.
+pass rubocop lintng and allow you to access nested mappings.
 
 ```ruby
 describe yaml('.kitchen.yml') do
@@ -251,18 +242,6 @@ inspec exec test.rb --sudo [--sudo-password ...] [--sudo-options ...] [--sudo_co
 
 # run in a subshell
 inspec exec test.rb --shell [--shell-options ...] [--shell-command ...]
-
-# run a profile targeting AWS using env vars
-inspec exec test.rb -t aws://
-
-# or store your AWS credentials in your ~/.aws/credentials profiles file
-inspec exec test.rb -t aws://us-east-2/my-profile
-
-# run a profile targeting Azure using env vars
-inspec exec test.rb -t azure://
-
-# or store your Azure credentials in your ~/.azure/credentials profiles file
-inspec exec test.rb -t azure://subscription_id
 ```
 
 ### detect
@@ -284,38 +263,38 @@ Which will provide you with:
 
 Remote Targets
 
-| Platform                     | Versions                                         | Architectures |
-| ---------------------------- | ------------------------------------------------ | ------------- |
-| AIX                          | 6.1, 7.1, 7.2                                    | ppc64         |
-| CentOS                       | 5, 6, 7                                          | i386, x86_64  |
-| Debian                       | 7, 8, 9                                          | i386, x86_64  |
-| FreeBSD                      | 9, 10, 11                                        | i386, amd64   |
-| Mac OS X                     | 10.9, 10.10, 10.11, 10.12, 10.13, 10.14          | x86_64        |
-| Oracle Enterprise Linux      | 5, 6, 7                                          | i386, x86_64  |
-| Red Hat Enterprise Linux     | 5, 6, 7                                          | i386, x86_64  |
-| Solaris                      | 10, 11                                           | sparc, x86    |
-| Windows\*                    | 7, 8, 8.1, 10, 2008, 2008R2 , 2012, 2012R2, 2016 | x86, x86_64   |
-| Ubuntu Linux                 |                                                  | x86, x86_64   |
-| SUSE Linux Enterprise Server | 11, 12                                           | x86_64        |
-| Scientific Linux             | 5.x, 6.x and 7.x                                 | i386, x86_64  |
-| Fedora                       |                                                  | x86_64        |
-| OpenSUSE                     | 13, 42                                           | x86_64        |
-| OmniOS                       |                                                  | x86_64        |
-| Gentoo Linux                 |                                                  | x86_64        |
-| Arch Linux                   |                                                  | x86_64        |
-| HP-UX                        | 11.31                                            | ia64          |
+Platform | Versions | Architectures
+ --- | --- | ---
+AIX | 6.1, 7.1, 7.2 | ppc64
+CentOS | 5, 6, 7 | i386, x86_64
+Debian | 7, 8 | i386, x86_64
+FreeBSD | 9, 10 | i386, amd64
+Mac OS X | 10.9, 10.10, 10.11 | x86_64
+Oracle Enterprise Linux | 5, 6, 7 | i386, x86_64
+Red Hat Enterprise Linux | 5, 6, 7 | i386, x86_64
+Solaris | 10, 11 | sparc, x86
+Windows | 7, 8, 8.1, 10, 2008, 2008R2 , 2012, 2012R2, 2016 | x86, x86_64
+Ubuntu Linux | | x86, x86_64
+SUSE Linux Enterprise Server  | 11, 12 | x86_64
+Scientific Linux | 5.x, 6.x and 7.x | i386, x86_64
+Fedora  | | x86_64
+OpenSUSE | 13.1/13.2/42.1 | x86_64
+OmniOS | | x86_64
+Gentoo Linux | | x86_64
+Arch Linux | | x86_64
+HP-UX | 11.31 | ia64
 
-\**For Windows, PowerShell 5.0 or above is required.*
+*For Windows, PowerShell 3.0 or above is required.*
 
 In addition, runtime support is provided for:
 
-| Platform | Versions |
-| -------- | -------- |
-| Debian   | 8, 9     |
-| RHEL     | 6, 7     |
-| Ubuntu   | 12.04+   |
-| Windows  | 7+       |
-| Windows  | 2012+    |
+Platform | Versions
+ ---- | ----
+Debian | 8
+RHEL | 6, 7
+Ubuntu | 12.04+
+Windows | 7+
+Windows | 2012+
 
 ## Documentation
 
@@ -343,7 +322,6 @@ You may also [browse the Supermarket for shared Compliance Profiles](https://sup
 
 InSpec is inspired by the wonderful [Serverspec](http://serverspec.org) project. Kudos to [mizzy](https://github.com/mizzy) and [all contributors](https://github.com/mizzy/serverspec/graphs/contributors)!
 
-The AWS resources were inspired by [inspec-aws](https://github.com/arothian/inspec-aws) from [arothian](https://github.com/arothian).
 
 ## Contribute
 
@@ -353,21 +331,18 @@ The AWS resources were inspired by [inspec-aws](https://github.com/arothian/insp
 1. Push to the branch (git push origin my-new-feature)
 1. Create new Pull Request
 
+
 The InSpec community and maintainers are very active and helpful. This project benefits greatly from this activity.
 
-If you'd like to chat with the community and maintainers directly join us in the `#inspec` channel on the [Chef Community Slack](http://community-slack.chef.io/).
+[![InSpec health](https://graphs.waffle.io/chef/inspec/throughput.svg)](https://waffle.io/chef/inspec/metrics/throughput)
 
-As a reminder, all participants are expected to follow the [Code of Conduct](https://github.com/inspec/inspec/blob/master/CODE_OF_CONDUCT.md).
-
-[![Slack](https://community-slack.chef.io/badge.svg)](https://community-slack.chef.io/)
 
 ## Testing InSpec
 
-We offer `unit`, `integration`, and `aws` tests.
+We perform `unit` and `integration` tests.
 
 - `unit` tests ensure the intended behaviour of the implementation
 - `integration` tests run against Docker-based VMs via test-kitchen and [kitchen-inspec](https://github.com/chef/kitchen-inspec)
-- `aws` tests exercise the AWS resources against real AWS accounts
 
 ### Unit tests
 
@@ -421,27 +396,15 @@ You may test all instances in parallel with:
 bundle exec kitchen test -c
 ```
 
-### AWS Tests
-
-Use the rake task `bundle exec rake test:aws` to test the AWS resources against a pair of real AWS accounts.
-
-Please see [TESTING_AGAINST_AWS.md](./test/integration/aws/TESTING_AGAINST_AWS.md) for details on how to setup the needed AWS accounts to perform testing.
-
-### Azure Tests
-
-Use the rake task `bundle exec rake test:azure` to test the Azure resources against an Azure account.
-
-Please see [TESTING_AGAINST_AZURE.md](./test/integration/aws/TESTING_AGAINST_AZURE.md) for details on how to setup the needed Azure accounts to perform testing.
-
 ## License
 
-|                |                                           |
-| -------------- | ----------------------------------------- |
-| **Author:**    | Dominik Richter (<drichter@chef.io>)      |
-| **Author:**    | Christoph Hartmann (<chartmann@chef.io>)  |
+|  |  |
+| ------ | --- |
+| **Author:** | Dominik Richter (<drichter@chef.io>) |
+| **Author:** | Christoph Hartmann (<chartmann@chef.io>) |
+| **Copyright:** | Copyright (c) 2015 Chef Software Inc. |
 | **Copyright:** | Copyright (c) 2015 Vulcano Security GmbH. |
-| **Copyright:** | Copyright (c) 2017-2018 Chef Software Inc.|
-| **License:**   | Apache License, Version 2.0               |
+| **License:** | Apache License, Version 2.0 |
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -454,4 +417,3 @@ distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
-

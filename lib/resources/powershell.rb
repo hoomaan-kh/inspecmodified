@@ -1,13 +1,13 @@
 # encoding: utf-8
 # copyright: 2015, Vulcano Security GmbH
+# author: Christoph Hartmann
+# author: Dominik Richter
 
 module Inspec::Resources
   class PowershellScript < Cmd
     name 'powershell'
-    supports platform: 'windows'
-    supports platform: 'unix'
     desc 'Use the powershell InSpec audit resource to test a Windows PowerShell script on the Microsoft Windows platform.'
-    example <<~EXAMPLE
+    example "
       script = <<-EOH
         # your powershell script
       EOH
@@ -15,25 +15,16 @@ module Inspec::Resources
       describe powershell(script) do
         its('matcher') { should eq 'output' }
       end
-    EXAMPLE
+    "
 
     def initialize(script)
-      # PowerShell is the default shell on Windows, use the `command` resource
-      return super(script) if inspec.os.windows?
-
-      unless inspec.command('pwsh').exist?
-        raise Inspec::Exceptions::ResourceSkipped, 'Can not find `pwsh` command'
+      unless inspec.os.windows?
+        super('')
+        return skip_resource 'The `script` resource is not supported on your OS yet.'
       end
-
-      # Prevent progress stream from leaking into stderr
-      command = "$ProgressPreference='SilentlyContinue';" + script
-
-      # Encode as Base64 to remove any quotes/escapes/etc issues
-      command = command.encode('UTF-16LE', 'UTF-8')
-      command = Base64.strict_encode64(command)
-
-      # Use the `command` resource to execute the command via `pwsh`
-      super("pwsh -encodedCommand '#{command}'")
+      # since WinRM 2.0 and the default use of powershell for local execution in
+      # train, we do not need to wrap the script here anymore
+      super(script)
     end
 
     # we cannot determine if a command exists, because that does not work for scripts
@@ -56,8 +47,12 @@ module Inspec::Resources
     name 'script'
 
     def initialize(script)
-      Inspec.deprecate(:resource_script, 'The `script` resource is deprecated. Please use `powershell` instead.')
+      deprecated
       super(script)
+    end
+
+    def deprecated
+      warn '[DEPRECATION] `script(script)` is deprecated.  Please use `powershell(script)` instead.'
     end
   end
 end

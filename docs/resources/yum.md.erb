@@ -1,6 +1,5 @@
 ---
 title: About the yum Resource
-platform: linux
 ---
 
 # yum
@@ -8,16 +7,6 @@ platform: linux
 Use the `yum` InSpec audit resource to test packages in the Yum repository.
 
 <br>
-
-## Availability
-
-### Installation
-
-This resource is distributed along with InSpec itself. You can use it automatically.
-
-### Version
-
-This resource first became available in v1.0.0 of InSpec.
 
 ## Syntax
 
@@ -71,7 +60,7 @@ The following examples show how to use this InSpec audit resource.
 
 ## Matchers
 
-For a full list of available matchers, please visit our [matchers page](https://www.inspec.io/docs/reference/matchers/).
+For a full list of available matchers please visit our [matchers page](https://www.inspec.io/docs/reference/matchers/). 
 
 ### be_enabled
 
@@ -101,7 +90,7 @@ The `repos` matcher tests if a named repo, using either a full identifier (`'upd
 
 ### shortname
 
-The `shortname` matcher names a specific package repository's group identifier. For example, if a repository's group name is "Directory Server", the corresponding group identifier is typically "directory-server":
+The `shortname` matcher names a specific package repository's group identifier. For example, if a repository's group name is "Directory Server", the corresponding group idenfier is typically "directory-server":
 
     describe yum.repo('Directory Server') do
       its('shortname') { should eq 'directory-server' }

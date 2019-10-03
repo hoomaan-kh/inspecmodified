@@ -11,18 +11,6 @@ describe Fetchers::Git do
     _(reg['git']).must_equal fetcher
   end
 
-  it 'handles sources beginning with `git@`' do
-    f = fetcher.resolve('git@github.com:foo/bar')
-    f.wont_be_nil
-    f.must_be_kind_of Fetchers::Git
-  end
-
-  it 'handles sources ending with `.git`' do
-    f = fetcher.resolve('https://github.com/foo/bar.git')
-    f.wont_be_nil
-    f.must_be_kind_of Fetchers::Git
-  end
-
   it "handles sources specified by a :git key" do
     f = fetcher.resolve({git: "https://example.com/foo.gi"})
     f.wont_be_nil
@@ -82,7 +70,7 @@ a7729ce65636d6d8b80159dd5dd7a40fdb6f2501\trefs/tags/anothertag^{}\n")
     end
 
     def expect_mv_into_place
-      FileUtils.expects(:cp_r).with('test-tmp-dir/.', 'fetchpath')
+      FileUtils.expects(:cp_r).with('test-tmp-dir', 'fetchpath')
     end
 
     it "resolves to the revision of master by default" do

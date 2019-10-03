@@ -11,14 +11,7 @@ module Inspec
       end
 
       def to_ruby
-        itsy = 'it'
-        unless its.nil?
-          if its.is_a? Array
-            itsy = 'its(' + its.inspect + ')'
-          else
-            itsy = 'its(' + its.to_s.inspect + ')'
-          end
-        end
+        itsy = its.nil? ? 'it' : 'its(' + its.to_s.inspect + ')'
         naughty = negated ? '_not' : ''
         xpect = if expectation.nil?
                   ''
@@ -57,8 +50,8 @@ module Inspec
       @variables = []
     end
 
-    def add_test(its, matcher, expectation, opts = {})
-      test = Inspec::Describe::Test.new(its, matcher, expectation, opts[:negated])
+    def add_test(its, matcher, expectation)
+      test = Inspec::Describe::Test.new(its, matcher, expectation, false)
       tests.push(test)
       test
     end

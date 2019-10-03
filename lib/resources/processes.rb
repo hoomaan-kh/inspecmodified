@@ -1,5 +1,7 @@
 # encoding: utf-8
 # copyright: 2015, Vulcano Security GmbH
+# author: Dominik Richter
+# author: Christoph Hartmann
 
 require 'utils/filter'
 require 'ostruct'
@@ -7,10 +9,8 @@ require 'ostruct'
 module Inspec::Resources
   class Processes < Inspec.resource(1)
     name 'processes'
-    supports platform: 'unix'
-    supports platform: 'windows'
     desc 'Use the processes InSpec audit resource to test properties for programs that are running on the system.'
-    example <<~EXAMPLE
+    example "
       describe processes('mysqld') do
         its('entries.length') { should eq 1 }
         its('users') { should eq ['mysql'] }
@@ -25,7 +25,7 @@ module Inspec::Resources
       describe processes do
         its('entries.length') { should be <= 100 }
       end
-    EXAMPLE
+    "
 
     def initialize(grep = /.*/)
       @grep = grep
@@ -56,24 +56,26 @@ module Inspec::Resources
     end
 
     def list
-      Inspec.deprecate(:property_processes_list, 'The processes `list` property is deprecated. Please use `entries` instead.')
+      warn '[DEPRECATION] `processes.list` is deprecated. Please use `processes.entries` instead. It will be removed in version 2.0.0.'
       @list
     end
 
     filter = FilterTable.create
-    filter.register_column(:labels,   field: 'label')
-          .register_column(:pids,     field: 'pid')
-          .register_column(:cpus,     field: 'cpu')
-          .register_column(:mem,      field: 'mem')
-          .register_column(:vsz,      field: 'vsz')
-          .register_column(:rss,      field: 'rss')
-          .register_column(:tty,      field: 'tty')
-          .register_column(:states,   field: 'stat')
-          .register_column(:start,    field: 'start')
-          .register_column(:time,     field: 'time')
-          .register_column(:users,    field: 'user')
-          .register_column(:commands, field: 'command')
-          .install_filter_methods_on_resource(self, :filtered_processes)
+    filter.add_accessor(:where)
+          .add_accessor(:entries)
+          .add(:labels,   field: 'label')
+          .add(:pids,     field: 'pid')
+          .add(:cpus,     field: 'cpu')
+          .add(:mem,      field: 'mem')
+          .add(:vsz,      field: 'vsz')
+          .add(:rss,      field: 'rss')
+          .add(:tty,      field: 'tty')
+          .add(:states,   field: 'stat')
+          .add(:start,    field: 'start')
+          .add(:time,     field: 'time')
+          .add(:users,    field: 'user')
+          .add(:commands, field: 'command')
+          .connect(self, :filtered_processes)
 
     private
 
@@ -126,7 +128,7 @@ module Inspec::Resources
     def ps_configuration_for_linux
       if busybox_ps?
         command = 'ps -o pid,vsz,rss,tty,stat,time,ruser,args'
-        regex = /^\s*(\d+)\s+(\d+(?:\.\d+)?[gm]?)\s+(\d+(?:\.\d+)?[gm]?)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(.*)$/
+        regex = /^\s*(\d+)\s+(\d+)\s+(\d+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(.*)$/
         field_map = {
           pid: 1,
           vsz: 2,
@@ -163,18 +165,6 @@ module Inspec::Resources
       @busybox_ps ||= inspec.command('ps --help').stderr.include?('BusyBox')
     end
 
-    def convert_to_kilobytes(param)
-      return param.to_i unless param.is_a?(String)
-
-      if param.end_with?('g')
-        (param[0..-2].to_f * 1024 * 1024).to_i
-      elsif param.end_with?('m')
-        (param[0..-2].to_f * 1024).to_i
-      else
-        param.to_i
-      end
-    end
-
     def build_process_list(command, regex, field_map)
       cmd = inspec.command(command)
       all = cmd.stdout.split("\n")[1..-1]
@@ -199,12 +189,8 @@ module Inspec::Resources
         end
 
         # ensure pid, vsz, and rss are integers for backward compatibility
-        process_data[:pid] = process_data[:pid].to_i if process_data.key?(:pid)
-
-        # some ps variants (*cough* busybox) display vsz and rss as human readable MB or GB
-        [:vsz, :rss].each do |param|
-          next unless process_data.key?(param)
-          process_data[param] = convert_to_kilobytes(process_data[param])
+        [:pid, :vsz, :rss].each do |int_param|
+          process_data[int_param] = process_data[int_param].to_i if process_data.key?(int_param)
         end
 
         # strip any newlines off the command

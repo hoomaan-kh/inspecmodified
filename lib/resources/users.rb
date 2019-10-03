@@ -1,4 +1,6 @@
 # encoding: utf-8
+# author: Christoph Hartmann
+# author: Dominik Richter
 
 require 'utils/parser'
 require 'utils/convert'
@@ -53,16 +55,14 @@ module Inspec::Resources
     include UserManagementSelector
 
     name 'users'
-    supports platform: 'unix'
-    supports platform: 'windows'
     desc 'Use the users InSpec audit resource to test local user profiles. Users can be filtered by groups to which they belong, the frequency of required password changes, the directory paths to home and shell.'
-    example <<~EXAMPLE
+    example "
       describe users.where { uid == 0 }.entries do
         it { should eq ['root'] }
         its('uids') { should eq [1234] }
         its('gids') { should eq [1234] }
       end
-    EXAMPLE
+    "
     def initialize
       # select user provider
       @user_provider = select_user_manager(inspec.os)
@@ -70,21 +70,23 @@ module Inspec::Resources
     end
 
     filter = FilterTable.create
-    filter.register_custom_matcher(:exists?) { |x| !x.entries.empty? }
-    filter.register_column(:usernames, field: :username)
-          .register_column(:uids,      field: :uid)
-          .register_column(:gids,      field: :gid)
-          .register_column(:groupnames, field: :groupname)
-          .register_column(:groups,    field: :groups)
-          .register_column(:homes,     field: :home)
-          .register_column(:shells,    field: :shell)
-          .register_column(:mindays,   field: :mindays)
-          .register_column(:maxdays,   field: :maxdays)
-          .register_column(:warndays,  field: :warndays)
-          .register_column(:disabled,  field: :disabled)
-          .register_custom_matcher(:disabled?) { |x| x.where { disabled == false }.entries.empty? }
-          .register_custom_matcher(:enabled?) { |x| x.where { disabled == true }.entries.empty? }
-    filter.install_filter_methods_on_resource(self, :collect_user_details)
+    filter.add_accessor(:where)
+          .add_accessor(:entries)
+          .add(:usernames, field: :username)
+          .add(:uids,      field: :uid)
+          .add(:gids,      field: :gid)
+          .add(:groupnames, field: :groupname)
+          .add(:groups,    field: :groups)
+          .add(:homes,     field: :home)
+          .add(:shells,    field: :shell)
+          .add(:mindays,   field: :mindays)
+          .add(:maxdays,   field: :maxdays)
+          .add(:warndays,  field: :warndays)
+          .add(:disabled,  field: :disabled)
+          .add(:exists?) { |x| !x.entries.empty? }
+          .add(:disabled?) { |x| x.where { disabled == false }.entries.empty? }
+          .add(:enabled?) { |x| x.where { disabled == true }.entries.empty? }
+    filter.connect(self, :collect_user_details)
 
     def to_s
       'Users'
@@ -138,16 +140,14 @@ module Inspec::Resources
   class User < Inspec.resource(1)
     include UserManagementSelector
     name 'user'
-    supports platform: 'unix'
-    supports platform: 'windows'
     desc 'Use the user InSpec audit resource to test user profiles, including the groups to which they belong, the frequency of required password changes, the directory paths to home and shell.'
-    example <<~EXAMPLE
+    example "
       describe user('root') do
         it { should exist }
         its('uid') { should eq 1234 }
         its('gid') { should eq 1234 }
       end
-    EXAMPLE
+    "
     def initialize(username = nil)
       @username = username
       # select user provider
@@ -213,36 +213,40 @@ module Inspec::Resources
 
     # implement 'mindays' method to be compatible with serverspec
     def minimum_days_between_password_change
-      Inspec.deprecate(:resource_user_serverspec_compat, 'The user resource `minimum_days_between_password_change` property is deprecated. Please use `mindays`.')
+      deprecated('minimum_days_between_password_change', "Please use: its('mindays')")
       mindays
     end
 
     # implement 'maxdays' method to be compatible with serverspec
     def maximum_days_between_password_change
-      Inspec.deprecate(:resource_user_serverspec_compat, 'The user resource `maximum_days_between_password_change` property is deprecated. Please use `maxdays`.')
+      deprecated('maximum_days_between_password_change', "Please use: its('maxdays')")
       maxdays
     end
 
     # implements rspec has matcher, to be compatible with serverspec
     # @see: https://github.com/rspec/rspec-expectations/blob/master/lib/rspec/matchers/built_in/has.rb
     def has_uid?(compare_uid)
-      Inspec.deprecate(:resource_user_serverspec_compat, 'The user resource `has_uid?` matcher is deprecated.')
+      deprecated('has_uid?')
       uid == compare_uid
     end
 
     def has_home_directory?(compare_home)
-      Inspec.deprecate(:resource_user_serverspec_compat, 'The user resource `has_home_directory?` matcher is deprecated. Please use `its(\'home\')`.')
+      deprecated('has_home_directory?', "Please use: its('home')")
       home == compare_home
     end
 
     def has_login_shell?(compare_shell)
-      Inspec.deprecate(:resource_user_serverspec_compat, 'The user resource `has_login_shell?` matcher is deprecated. Please use `its(\'shell\')`.')
+      deprecated('has_login_shell?', "Please use: its('shell')")
       shell == compare_shell
     end
 
     def has_authorized_key?(_compare_key)
-      Inspec.deprecate(:resource_user_serverspec_compat, 'The user resource `has_authorized_key?` matcher is deprecated. There is no currently implemented alternative')
+      deprecated('has_authorized_key?')
       raise NotImplementedError
+    end
+
+    def deprecated(name, alternative = nil)
+      warn "[DEPRECATION] #{name} is deprecated. #{alternative}"
     end
 
     def to_s

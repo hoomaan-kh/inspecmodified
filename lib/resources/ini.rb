@@ -1,18 +1,18 @@
 # encoding: utf-8
+# author: Christoph Hartmann
+# author: Dominik Richter
 
 require 'utils/simpleconfig'
 
 module Inspec::Resources
   class IniConfig < JsonConfig
     name 'ini'
-    supports platform: 'unix'
-    supports platform: 'windows'
     desc 'Use the ini InSpec audit resource to test data in a INI file.'
-    example <<~EXAMPLE
+    example "
       descibe ini do
         its('auth_protocol') { should eq 'https' }
       end
-    EXAMPLE
+    "
     # override file load and parse hash with simple config
     def parse(content)
       SimpleConfig.new(content).params

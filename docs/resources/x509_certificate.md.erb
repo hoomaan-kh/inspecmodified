@@ -1,6 +1,5 @@
 ---
 title: The x509_certificate Resource
-platform: os
 ---
 
 # x509_certificate
@@ -15,16 +14,6 @@ certificates.
 
 <br>
 
-## Availability
-
-### Installation
-
-This resource is distributed along with InSpec itself. You can use it automatically.
-
-### Version
-
-This resource first became available in v1.18.0 of InSpec.
-
 ## Syntax
 
 An `x509_certificate` resource block declares a certificate `key file` to be tested.
@@ -35,7 +24,7 @@ An `x509_certificate` resource block declares a certificate `key file` to be tes
 
 <br>
 
-## Properties
+## Supported Properties
 
 ### subject.XX
 
@@ -102,7 +91,7 @@ sign the certificate.
     end
 
 
-### validity\_in\_days (Float)
+### validity_in_days (Float)
 
 The `validity_in_days` property can be used to check that certificates are not in
 danger of expiring soon.
@@ -111,7 +100,7 @@ danger of expiring soon.
       its('validity_in_days') { should be > 30 }
     end
 
-### not\_before and not\_after (Time)
+### not_before and not_after (Time)
 
 The `not_before` and `not_after` properties expose the start and end dates of certificate
 validity. They are exposed as ruby Time class so that date arithmetic can be easily performed.

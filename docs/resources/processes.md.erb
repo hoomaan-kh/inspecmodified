@@ -1,6 +1,5 @@
 ---
 title: About the processes Resource
-platform: os
 ---
 
 # processes
@@ -8,16 +7,6 @@ platform: os
 Use the `processes` InSpec audit resource to test properties for programs that are running on the system.
 
 <br>
-
-## Availability
-
-### Installation
-
-This resource is distributed along with InSpec itself. You can use it automatically.
-
-### Version
-
-This resource first became available in v1.0.0 of InSpec.
 
 ## Syntax
 
@@ -44,7 +33,7 @@ The following examples show how to use this InSpec audit resource.
       its('list.length') { should eq 1 }
     end
 
-### Test if the process is owned by a specific user
+### Test if the process is owned by a specifc user
 
     describe processes('init') do
       its('users') { should eq ['root'] }
@@ -106,11 +95,10 @@ Below is a mapping table to help you understand what property the unix field map
 |users            |UserName|
 |commands         |Path|
 
-<br>
 
 ## Matchers
 
-For a full list of available matchers, please visit our [matchers page](https://www.inspec.io/docs/reference/matchers/).
+For a full list of available matchers please visit our [matchers page](https://www.inspec.io/docs/reference/matchers/). 
 
 ### property_name
 

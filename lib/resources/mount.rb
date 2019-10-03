@@ -1,13 +1,15 @@
 # encoding: utf-8
+# author: Christoph Hartmann
+# author: Dominik Richter
+# author: Joseph Benden
 
 require 'utils/simpleconfig'
 
 module Inspec::Resources
   class Mount < Inspec.resource(1)
     name 'mount'
-    supports platform: 'unix'
     desc 'Use the mount InSpec audit resource to test if mount points.'
-    example <<~EXAMPLE
+    example "
       describe mount('/') do
         it { should be_mounted }
         its('count') { should eq 1 }
@@ -16,7 +18,7 @@ module Inspec::Resources
         its('options') { should eq ['rw', 'mode=620'] }
         its('options') { should include 'nodev' }
       end
-    EXAMPLE
+    "
     attr_reader :file
 
     def initialize(path)

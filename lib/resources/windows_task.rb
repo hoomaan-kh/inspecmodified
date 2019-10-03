@@ -1,10 +1,11 @@
 # encoding: utf-8
+# author: Gary Bright @username-is-already-taken2
+# author: Chris Beard @cdbeard2016
 module Inspec::Resources
   class WindowsTasks < Inspec.resource(1)
     name 'windows_task'
-    supports platform: 'windows'
     desc 'Use the windows_task InSpec audit resource to test task schedules on Microsoft Windows.'
-    example <<~EXAMPLE
+    example "
       describe windows_task('\\Microsoft\\Windows\\Time Synchronization\\SynchronizeTime') do
         it { should be_enabled }
       end
@@ -23,11 +24,14 @@ module Inspec::Resources
         its('task_to_run') { should cmp '%Windir%\\system32\\appidpolicyconverter.exe' }
         its('run_as_user') { should eq 'LOCAL SERVICE' }
       end
-    EXAMPLE
+    "
 
     def initialize(taskuri)
       @taskuri = taskuri
       @cache = nil
+
+      # verify that this resource is only supported on Windows
+      return skip_resource 'The `windows_task` resource is not supported on your OS.' unless inspec.os.windows?
     end
 
     def exists?

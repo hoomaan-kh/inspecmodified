@@ -1,9 +1,12 @@
 # encoding: utf-8
+# author: Christoph Hartmann
+# author: Dominik Richter
+# author: Aaron Lippold
+# author: Adam Leff
 
 module Inspec::Resources
   class KernelModule < Inspec.resource(1)
     name 'kernel_module'
-    supports platform: 'unix'
     desc 'Use the kernel_module InSpec audit resource to test kernel modules on
     Linux platforms. These parameters are located under /lib/modules. Any submodule
     may be tested using this resource.
@@ -12,26 +15,27 @@ module Inspec::Resources
     or if a module is disabled via a fake install using the `bin_true` or `bin_false`
     method.'
 
-    example <<~EXAMPLE
-      describe kernel_module('video') do
-        it { should be_loaded }
-        it { should_not be_disabled }
-        it { should_not be_blacklisted }
-      end
+    example "
 
-      describe kernel_module('sstfb') do
-        it { should_not be_loaded }
-        it { should be_disabled }
-      end
+    describe kernel_module('video') do
+      it { should be_loaded }
+      it { should_not be_disabled }
+      it { should_not be_blacklisted }
+    end
 
-      describe kernel_module('floppy') do
-        it { should be_blacklisted }
-      end
+    describe kernel_module('sstfb') do
+      it { should_not be_loaded }
+      it { should be_disabled }
+    end
 
-      describe kernel_module('dhcp') do
-        it { should_not be_loaded }
-      end
-    EXAMPLE
+    describe kernel_module('floppy') do
+      it { should be_blacklisted }
+    end
+
+    describe kernel_module('dhcp') do
+      it { should_not be_loaded }
+    end
+    "
 
     def initialize(modulename = nil)
       @module = modulename

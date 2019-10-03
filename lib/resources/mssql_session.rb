@@ -1,4 +1,7 @@
 # encoding: utf-8
+# author: Nolan Davidson
+# author: Christoph Hartmann
+# author: Dominik Richter
 
 require 'hashie/mash'
 require 'utils/database_helpers'
@@ -12,9 +15,8 @@ module Inspec::Resources
   # @see https://docs.microsoft.com/en-us/sql/linux/sql-server-linux-connect-and-query-sqlcmd
   class MssqlSession < Inspec.resource(1)
     name 'mssql_session'
-    supports platform: 'windows'
     desc 'Use the mssql_session InSpec audit resource to test SQL commands run against a MS Sql Server database.'
-    example <<~EXAMPLE
+    example "
       # Using SQL authentication
       sql = mssql_session(user: 'myuser', pass: 'mypassword')
       describe sql.query('SELECT * FROM table').row(0).column('columnname') do
@@ -27,26 +29,18 @@ module Inspec::Resources
         its('value') { should_not be_empty }
         its('value') { should cmp == 1 }
       end
-    EXAMPLE
+    "
 
-    attr_reader :user, :password, :host, :port, :instance, :local_mode, :db_name
+    attr_reader :user, :password, :host, :port, :instance
     def initialize(opts = {})
       @user = opts[:user]
       @password = opts[:password] || opts[:pass]
       if opts[:pass]
-        Inspec.deprecate(:mssql_session_pass_option, 'The mssql_session `pass` option is deprecated. Please use `password`.')
+        warn '[DEPRECATED] use `password` option to supply password instead of `pass`'
       end
-      @local_mode = opts[:local_mode]
-      unless local_mode?
-        @host = opts[:host] || 'localhost'
-        if opts.key?(:port)
-          @port = opts[:port]
-        else
-          @port = '1433'
-        end
-      end
+      @host = opts[:host] || 'localhost'
+      @port = opts[:port] || '1433'
       @instance = opts[:instance]
-      @db_name = opts[:db_name]
 
       # check if sqlcmd is available
       raise Inspec::Exceptions::ResourceSkipped, 'sqlcmd is missing' unless inspec.command('sqlcmd').exist?
@@ -54,28 +48,23 @@ module Inspec::Resources
       raise Inspec::Exceptions::ResourceSkipped, "Can't connect to the MS SQL Server." unless test_connection
     end
 
-    def query(q) # rubocop:disable Metrics/PerceivedComplexity
+    def query(q)
       escaped_query = q.gsub(/\\/, '\\\\').gsub(/"/, '\\"').gsub(/\$/, '\\$')
       # surpress 'x rows affected' in SQLCMD with 'set nocount on;'
       cmd_string = "sqlcmd -Q \"set nocount on; #{escaped_query}\" -W -w 1024 -s ','"
       cmd_string += " -U '#{@user}' -P '#{@password}'" unless @user.nil? || @password.nil?
-      cmd_string += " -d '#{@db_name}'" unless @db_name.nil?
-      unless local_mode?
-        if @port.nil?
-          cmd_string += " -S '#{@host}"
-        else
-          cmd_string += " -S '#{@host},#{@port}"
-        end
-        if @instance.nil?
-          cmd_string += "'"
-        else
-          cmd_string += "\\#{@instance}'"
-        end
+      if @instance.nil?
+        cmd_string += " -S '#{@host},#{@port}'"
+      else
+        cmd_string += " -S '#{@host},#{@port}\\#{@instance}'"
       end
       cmd = inspec.command(cmd_string)
       out = cmd.stdout + "\n" + cmd.stderr
       if cmd.exit_status != 0 || out =~ /Sqlcmd: Error/
-        raise Inspec::Exceptions::ResourceFailed, "Could not execute the sql query #{out}"
+        # TODO: we need to throw an exception here
+        # change once https://github.com/chef/inspec/issues/1205 is in
+        warn "Could not execute the sql query #{out}"
+        DatabaseHelper::SQLQueryResult.new(cmd, Hashie::Mash.new({}))
       else
         DatabaseHelper::SQLQueryResult.new(cmd, parse_csv_result(cmd))
       end
@@ -86,10 +75,6 @@ module Inspec::Resources
     end
 
     private
-
-    def local_mode?
-      !!@local_mode # rubocop:disable Style/DoubleNegation
-    end
 
     def test_connection
       !query('select getdate()').empty?

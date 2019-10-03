@@ -100,23 +100,7 @@ module Inspec
       walk_zip(@path) do |io|
         while (entry = io.get_next_entry)
           name = entry.name.sub(%r{/+$}, '')
-          @files.push(name) unless name.empty? || name.squeeze('/') =~ %r{\.{2}(?:/|\z)}
-        end
-      end
-    end
-
-    def extract(destination_path = '.')
-      FileUtils.mkdir_p(destination_path)
-
-      Zip::File.open(@path) do |archive|
-        archive.each do |file|
-          final_path = File.join(destination_path, file.name)
-
-          # This removes the top level directory (and any other files) to ensure
-          # extracted files do not conflict.
-          FileUtils.remove_entry(final_path) if File.exist?(final_path)
-
-          archive.extract(file, final_path)
+          @files.push(name) unless name.empty?
         end
       end
     end
@@ -156,31 +140,13 @@ module Inspec
         @files = tar.find_all(&:file?)
 
         # delete all entries with no name
-        @files = @files.find_all { |x| !x.full_name.empty? && x.full_name.squeeze('/') !~ %r{\.{2}(?:/|\z)} }
+        @files = @files.find_all { |x| !x.full_name.empty? }
 
         # delete all entries that have a PaxHeader
         @files = @files.delete_if { |x| x.full_name.include?('PaxHeader/') }
 
         # replace all items of the array simply with the relative filename of the file
         @files.map! { |x| Pathname.new(x.full_name).relative_path_from(Pathname.new('.')).to_s }
-      end
-    end
-
-    def extract(destination_path = '.')
-      FileUtils.mkdir_p(destination_path)
-
-      walk_tar(@path) do |files|
-        files.each do |file|
-          next unless @files.include?(file.full_name)
-          final_path = File.join(destination_path, file.full_name)
-
-          # This removes the top level directory (and any other files) to ensure
-          # extracted files do not conflict.
-          FileUtils.remove_entry(final_path) if File.exist?(final_path)
-
-          FileUtils.mkdir_p(File.dirname(final_path))
-          File.open(final_path, 'wb') { |f| f.write(file.read) }
-        end
       end
     end
 
@@ -191,10 +157,7 @@ module Inspec
     private
 
     def walk_tar(path, &callback)
-      tar_file = Zlib::GzipReader.open(path)
-      Gem::Package::TarReader.new(tar_file, &callback)
-    ensure
-      tar_file.close
+      Gem::Package::TarReader.new(Zlib::GzipReader.open(path), &callback)
     end
 
     def read_from_tar(file)

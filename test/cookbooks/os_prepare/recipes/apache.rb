@@ -1,3 +1,4 @@
+# encoding: utf-8
 # author: Christoph Hartmann
 
 case node['platform_family']

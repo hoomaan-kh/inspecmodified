@@ -10,7 +10,6 @@ require 'inspec/profile_context'
 require 'inspec/profile'
 require 'inspec/metadata'
 require 'inspec/secrets'
-require 'inspec/config'
 require 'inspec/dependencies/cache'
 # spec requirements
 
@@ -32,35 +31,31 @@ module Inspec
   class Runner
     extend Forwardable
 
-    attr_reader :backend, :rules, :inputs
+    def_delegator :@test_collector, :report
 
-    def attributes
-      Inspec.deprecate(:rename_attributes_to_inputs, "Don't call runner.attributes, call runner.inputs")
-      inputs
-    end
-
+    attr_reader :backend, :rules, :attributes
     def initialize(conf = {})
       @rules = []
-      # If we were handed a Hash config (by audit cookbook or kitchen-inspec),
-      # upgrade it to a proper config. This handles a lot of config finalization,
-      # like reporter parsing.
-      @conf = conf.is_a?(Hash) ? Inspec::Config.new(conf) : conf
+      @conf = conf.dup
       @conf[:logger] ||= Logger.new(nil)
       @target_profiles = []
       @controls = @conf[:controls] || []
       @depends = @conf[:depends] || []
+      @ignore_supports = @conf[:ignore_supports]
       @create_lockfile = @conf[:create_lockfile]
       @cache = Inspec::Cache.new(@conf[:vendor_cache])
-
       @test_collector = @conf.delete(:test_collector) || begin
         require 'inspec/runner_rspec'
         RunnerRspec.new(@conf)
       end
 
-      # list of profile inputs
-      @inputs = {}
+      # parse any ad-hoc runners reporter formats
+      @conf = Inspec::BaseCLI.parse_reporters(@conf) if @conf[:type].nil?
 
-      load_inputs(@conf)
+      # list of profile attributes
+      @attributes = []
+
+      load_attributes(@conf)
       configure_transport
     end
 
@@ -86,24 +81,16 @@ module Inspec
 
       @target_profiles.each do |profile|
         @test_collector.add_profile(profile)
-        next unless profile.supports_platform?
-
         write_lockfile(profile) if @create_lockfile
         profile.locked_dependencies
         profile_context = profile.load_libraries
 
         profile_context.dependencies.list.values.each do |requirement|
-          unless requirement.profile.supports_platform?
-            Inspec::Log.warn "Skipping profile: '#{requirement.profile.name}'" \
-             " on unsupported platform: '#{@backend.platform.name}/#{@backend.platform.release}'."
-            next
-          end
           @test_collector.add_profile(requirement.profile)
         end
 
-        @inputs = profile.runner_context.inputs if @inputs.empty?
-        tests = profile.collect_tests
-        all_controls += tests unless tests.nil?
+        @attributes |= profile.runner_context.attributes
+        all_controls += profile.collect_tests
       end
 
       all_controls.each do |rule|
@@ -121,13 +108,8 @@ module Inspec
       return if @conf['reporter'].nil?
 
       @conf['reporter'].each do |reporter|
-        result = Inspec::Reporters.render(reporter, run_data)
-        raise Inspec::ReporterError, "Error generating reporter '#{reporter[0]}'" if result == false
+        Inspec::Reporters.render(reporter, run_data)
       end
-    end
-
-    def report
-      Inspec::Reporters.report(@conf['reporter'].first, @run_data)
     end
 
     def write_lockfile(profile)
@@ -143,36 +125,30 @@ module Inspec
     end
 
     def run_tests(with = nil)
-      @run_data = @test_collector.run(with)
-      # dont output anything if we want a report
-      render_output(@run_data) unless @conf['report']
-      @test_collector.exit_code
+      status, run_data = @test_collector.run(with)
+      render_output(run_data)
+      status
     end
 
-    # determine all inputs before the execution, fetch data from secrets backend
-    def load_inputs(options)
-      # TODO: - rename :attributes - it is user-visible
+    # determine all attributes before the execution, fetch data from secrets backend
+    def load_attributes(options)
       options[:attributes] ||= {}
 
-      if options.key?(:attrs)
-        Inspec.deprecate(:rename_attributes_to_inputs, 'Use --input-file on the command line instead of --attrs.')
-        options[:input_file] = options.delete(:attrs)
-      end
-      secrets_targets = options[:input_file]
+      secrets_targets = options[:attrs]
       return options[:attributes] if secrets_targets.nil?
 
       secrets_targets.each do |target|
-        validate_inputs_file_readability!(target)
+        validate_attributes_file_readability!(target)
 
         secrets = Inspec::SecretsBackend.resolve(target)
         if secrets.nil?
           raise Inspec::Exceptions::SecretsBackendNotFound,
-                "Cannot find parser for inputs file '#{target}'. " \
+                "Cannot find parser for attributes file '#{target}'. " \
                 'Check to make sure file has the appropriate extension.'
         end
 
-        next if secrets.inputs.nil?
-        options[:attributes].merge!(secrets.inputs)
+        next if secrets.attributes.nil?
+        options[:attributes].merge!(secrets.attributes)
       end
 
       options[:attributes]
@@ -184,7 +160,7 @@ module Inspec
     #
     # A target is a path or URL that points to a profile. Using this
     # target we generate a Profile and a ProfileContext. The content
-    # (libraries, tests, and inputs) from the Profile are loaded
+    # (libraries, tests, and attributes) from the Profile are loaded
     # into the ProfileContext.
     #
     # If the profile depends on other profiles, those profiles will be
@@ -209,16 +185,22 @@ module Inspec
                                            vendor_cache: @cache,
                                            backend: @backend,
                                            controls: @controls,
-                                           inputs: @conf[:attributes]) # TODO: read form :inputs here (user visible)
+                                           attributes: @conf[:attributes])
       raise "Could not resolve #{target} to valid input." if profile.nil?
       @target_profiles << profile if supports_profile?(profile)
     end
 
     def supports_profile?(profile)
+      return true if @ignore_supports
+
       if !profile.supports_runtime?
         raise 'This profile requires InSpec version '\
              "#{profile.metadata.inspec_requirement}. You are running "\
              "InSpec v#{Inspec::VERSION}.\n"
+      end
+
+      if !profile.supports_platform?
+        raise "This OS/platform (#{@backend.platform.name}/#{@backend.platform.release}) is not supported by this profile."
       end
 
       true
@@ -249,11 +231,9 @@ module Inspec
 
       # Load local profile dependencies. This is used in inspec shell
       # to provide access to local profiles that add resources.
-      @depends.each do |dep|
-        # support for windows paths
-        dep = dep.tr('\\', '/')
-        Inspec::Profile.for_path(dep, { profile_context: ctx }).load_libraries
-      end
+      @depends
+        .map { |x| Inspec::Profile.for_path(x, { profile_context: ctx }) }
+        .each(&:load_libraries)
 
       ctx.load(command)
     end
@@ -274,15 +254,12 @@ module Inspec
 
       return nil if arg.empty?
 
-      resource = arg[0]
-      # check to see if we are using a filtertable object
-      resource = arg[0].resource if arg[0].class.superclass == FilterTable::Table
-      if resource.respond_to?(:resource_skipped?) && resource.resource_skipped?
-        return rspec_skipped_block(arg, opts, resource.resource_exception_message)
+      if arg[0].respond_to?(:resource_skipped?) && arg[0].resource_skipped?
+        return rspec_skipped_block(arg, opts, arg[0].resource_exception_message)
       end
 
-      if resource.respond_to?(:resource_failed?) && resource.resource_failed?
-        return rspec_failed_block(arg, opts, resource.resource_exception_message)
+      if arg[0].respond_to?(:resource_failed?) && arg[0].resource_failed?
+        return rspec_failed_block(arg, opts, arg[0].resource_exception_message)
       end
 
       # If neither skipped nor failed then add the resource
@@ -300,16 +277,16 @@ module Inspec
       examples.each { |e| @test_collector.add_test(e, rule) }
     end
 
-    def validate_inputs_file_readability!(target)
+    def validate_attributes_file_readability!(target)
       unless File.exist?(target)
-        raise Inspec::Exceptions::InputsFileDoesNotExist,
-              "Cannot find input file '#{target}'. " \
+        raise Inspec::Exceptions::AttributesFileDoesNotExist,
+              "Cannot find attributes file '#{target}'. " \
               'Check to make sure file exists.'
       end
 
       unless File.readable?(target)
-        raise Inspec::Exceptions::InputsFileNotReadable,
-              "Cannot read input file '#{target}'. " \
+        raise Inspec::Exceptions::AttributesFileNotReadable,
+              "Cannot read attributes file '#{target}'. " \
               'Check to make sure file is readable.'
       end
 

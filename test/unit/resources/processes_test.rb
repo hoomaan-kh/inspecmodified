@@ -13,11 +13,7 @@ describe 'Inspec::Resources::Processes' do
 
   it 'verify processes resource' do
     resource = MockLoader.new(:freebsd10).load_resource('processes', 'login -fp apop')
-
-    expect_deprecation(:property_processes_list) do
-      resource.list.length.must_equal 2
-    end
-
+    _(resource.list.length).must_equal 2      # until we deprecate
     _(resource.entries.length).must_equal 2
     _(resource.entries[0].to_h).must_equal({
       label: nil,
@@ -93,7 +89,7 @@ describe 'Inspec::Resources::Processes' do
     })
   end
 
-  it 'access information of a process' do
+  it 'access attributes of a process' do
     resource = MockLoader.new(:centos6).load_resource('processes', 'postgres: bifrost bifrost')
     process = resource.entries[0]
     process.user.must_equal 'opscode-pgsql'
@@ -142,63 +138,6 @@ describe 'Inspec::Resources::Processes' do
       time: '00:00:00',
       user: 'ntp',
       command: '/usr/sbin/ntpd -p /var/run/ntpd.pid -g -u 112:117',
-    })
-  end
-
-  it 'handles regular processes from busybox' do
-    resource = MockLoader.new(:alpine).load_resource('processes', '/some/other/coolprogram')
-    _(resource.entries.length).must_equal 1
-    _(resource.entries[0].to_h).must_equal({
-      label: nil,
-      pid: 5,
-      cpu: nil,
-      mem: nil,
-      vsz: 1528,
-      rss: 4,
-      tty: '136,0',
-      stat: 'R',
-      start: nil,
-      time: '0:00',
-      user: 'joe',
-      command: '/some/other/coolprogram',
-    })
-  end
-
-  it 'handles human readable megabytes from busybox' do
-    resource = MockLoader.new(:alpine).load_resource('processes', '/a/bigger/program')
-    _(resource.entries.length).must_equal 1
-    _(resource.entries[0].to_h).must_equal({
-      label: nil,
-      pid: 82,
-      cpu: nil,
-      mem: nil,
-      vsz: 24576,
-      rss: 2048,
-      tty: '?',
-      stat: 'S',
-      start: nil,
-      time: '3:50',
-      user: 'frank',
-      command: '/a/bigger/program',
-    })
-  end
-
-  it 'handles human readable gigabytes from busybox' do
-    resource = MockLoader.new(:alpine).load_resource('processes', '/the/biggest/program')
-    _(resource.entries.length).must_equal 1
-    _(resource.entries[0].to_h).must_equal({
-      label: nil,
-      pid: 83,
-      cpu: nil,
-      mem: nil,
-      vsz: 2726297,
-      rss: 1048576,
-      tty: '?',
-      stat: 'S',
-      start: nil,
-      time: '39:00',
-      user: 'tim',
-      command: '/the/biggest/program',
     })
   end
 

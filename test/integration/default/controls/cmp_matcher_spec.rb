@@ -25,7 +25,7 @@ if os.linux?
     it { should cmp 'x' }
   end
 
-  describe passwd.users do
+  describe passwd.usernames do
     it { should include 'root' }
     it { should_not cmp 'root' }
   end
@@ -69,19 +69,6 @@ if os.linux?
     it { should cmp >= -666 }
     it { should_not cmp <= 11 }
     it { should_not cmp >= 13 }
-  end
-
-  describe '-12' do
-    it { should cmp -12 }
-    it { should cmp < -11 }
-    it { should cmp > -13 }
-    it { should_not cmp < -12 }
-    it { should_not cmp > -12 }
-    it { should cmp <= -12 }
-    it { should cmp >= -12 }
-    it { should cmp >= -666 }
-    it { should_not cmp <= -13 }
-    it { should_not cmp >= -11 }
   end
 
   # versions

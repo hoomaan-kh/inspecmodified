@@ -1,4 +1,7 @@
 # encoding: utf-8
+# author: Christoph Hartmann
+# author: Dominik Richter
+# author: Jen Burns
 
 require 'forwardable'
 require 'utils/filter_array'
@@ -12,9 +15,8 @@ module Inspec::Resources
     attr_reader :params
 
     name 'auditd'
-    supports platform: 'unix'
     desc 'Use the auditd InSpec audit resource to test the rules for logging that exist on the system. The audit.rules file is typically located under /etc/audit/ and contains the list of rules that define what is captured in log files. These rules are output using the auditcl -l command.'
-    example <<~EXAMPLE
+    example "
       describe auditd.syscall('chown').where {arch == 'b32'} do
         its('action') { should eq ['always'] }
         its('list') { should eq ['exit'] }
@@ -27,58 +29,37 @@ module Inspec::Resources
       describe auditd do
         its('lines') { should include %r(-w /etc/ssh/sshd_config) }
       end
-    EXAMPLE
+    "
 
     def initialize
-      unless inspec.command('/sbin/auditctl').exist?
-        raise Inspec::Exceptions::ResourceFailed,
-              'Command `/sbin/auditctl` does not exist'
-      end
-
-      auditctl_cmd = '/sbin/auditctl -l'
-      result = inspec.command(auditctl_cmd)
-
-      if result.exit_status != 0
-        raise Inspec::Exceptions::ResourceFailed,
-              "Command `#{auditctl_cmd}` failed with error: #{result.stderr}"
-      end
-
-      @content = result.stdout
+      @content = inspec.command('/sbin/auditctl -l').stdout.chomp
       @params = []
 
       if @content =~ /^LIST_RULES:/
-        raise Inspec::Exceptions::RsourceFailed,
-              'The version of audit is outdated.' \
-              'The `auditd` resource supports versions of audit >= 2.3.'
+        return skip_resource 'The version of audit is outdated. The `auditd` resource supports versions of audit >= 2.3.'
       end
       parse_content
     end
 
     filter = FilterTable.create
-    filter.register_column(:file,         field: 'file')
-          .register_column(:list,         field: 'list')
-          .register_column(:action,       field: 'action')
-          .register_column(:fields,       field: 'fields')
-          .register_column(:fields_nokey, field: 'fields_nokey')
-          .register_column(:syscall,      field: 'syscall')
-          .register_column(:key,          field: 'key')
-          .register_column(:arch,         field: 'arch')
-          .register_column(:path,         field: 'path')
-          .register_column(:permissions,  field: 'permissions')
-          .register_column(:exit,         field: 'exit')
+    filter.add_accessor(:where)
+          .add_accessor(:entries)
+          .add(:file,         field: 'file')
+          .add(:list,         field: 'list')
+          .add(:action,       field: 'action')
+          .add(:fields,       field: 'fields')
+          .add(:fields_nokey, field: 'fields_nokey')
+          .add(:syscall,      field: 'syscall')
+          .add(:key,          field: 'key')
+          .add(:arch,         field: 'arch')
+          .add(:path,         field: 'path')
+          .add(:permissions,  field: 'permissions')
+          .add(:exit,         field: 'exit')
 
-    filter.install_filter_methods_on_resource(self, :params)
+    filter.connect(self, :params)
 
     def status(name = nil)
       @status_content ||= inspec.command('/sbin/auditctl -s').stdout.chomp
-
-      # See: https://github.com/inspec/inspec/issues/3113
-      if @status_content =~ /^AUDIT_STATUS/
-        @status_content = @status_content.gsub('AUDIT_STATUS: ', '')
-                                         .tr(' ', "\n")
-                                         .tr('=', ' ')
-      end
-
       @status_params ||= Hash[@status_content.scan(/^([^ ]+) (.*)$/)]
 
       return @status_params[name] if name

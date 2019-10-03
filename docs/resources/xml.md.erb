@@ -1,6 +1,5 @@
 ---
 title: About the xml Resource
-platform: os
 ---
 
 # xml
@@ -8,16 +7,6 @@ platform: os
 Use the `xml` InSpec audit resource to test data in an XML file.
 
 <br>
-
-## Availability
-
-### Installation
-
-This resource is distributed along with InSpec itself. You can use it automatically.
-
-### Version
-
-This resource first became available in v1.37.6 of InSpec.
 
 ## Syntax
 
@@ -52,8 +41,6 @@ This file can be queried for attributes using:
       its('root/array[2]/element/@value') { should eq ['one', 'two'] }
       its('root/array[2]/element/attribute::value') { should eq ['one', 'two'] }
       its('root/array[2]/element[2]/attribute::value') { should eq ['two'] }
-      its('count(//*)') { should eq [42] }
-      its('boolean(root/array[2]/element[2]/@valid)') { should eq [false] }
     end
 
 where
@@ -63,11 +50,11 @@ where
 
 In the above example, you see the use of `@` and `attribute::` which are both methods of fetching attributes.
 
+<br>
+
 In the event the path contains an element which contains periods, the alternate syntax can be used:
 
     its(['root/name.with.a.period']) { should cmp 'so_many_dots' }
-
-<br>
 
 ## Examples
 
@@ -88,7 +75,7 @@ The following examples show how to use this InSpec audit resource.
 
 ## Matchers
 
-For a full list of available matchers, please visit our [matchers page](https://www.inspec.io/docs/reference/matchers/).
+For a full list of available matchers please visit our [matchers page](https://www.inspec.io/docs/reference/matchers/). 
 
 ### name
 

@@ -8,17 +8,17 @@ require 'inspec/library_eval_context'
 require 'inspec/control_eval_context'
 require 'inspec/require_loader'
 require 'securerandom'
-require 'inspec/objects/input'
+require 'inspec/objects/attribute'
 
 module Inspec
   class ProfileContext
-    def self.for_profile(profile, backend, inputs)
+    def self.for_profile(profile, backend, attributes)
       new(profile.name, backend, { 'profile' => profile,
-                                   'inputs' => inputs,
+                                   'attributes' => attributes,
                                    'check_mode' => profile.check_mode })
     end
 
-    attr_reader :inputs, :backend, :profile_name, :profile_id, :resource_registry
+    attr_reader :attributes, :profile_id, :resource_registry, :backend
     attr_accessor :rules
     def initialize(profile_id, backend, conf)
       if backend.nil?
@@ -28,19 +28,16 @@ module Inspec
       @profile_id = profile_id
       @backend = backend
       @conf = conf.dup
-      @profile_name = @conf['profile'].profile_name || @profile_id if @conf['profile']
       @skip_only_if_eval = @conf['check_mode']
       @rules = {}
       @control_subcontexts = []
       @lib_subcontexts = []
       @require_loader = ::Inspec::RequireLoader.new
-      Inspec::InputRegistry.register_profile_alias(@profile_id, @profile_name) if @profile_id != @profile_name
-      @inputs = Inspec::InputRegistry.list_inputs_for_profile(@profile_id)
+      @attributes = []
       # A local resource registry that only contains resources defined
       # in the transitive dependency tree of the loaded profile.
       @resource_registry = Inspec::Resource.new_registry
       @library_eval_context = Inspec::LibraryEvalContext.create(@resource_registry, @require_loader)
-      @current_load = nil
     end
 
     def dependencies
@@ -187,11 +184,13 @@ module Inspec
       end
     end
 
-    def register_input(name, options = {})
-      # we need to return an input object, to allow dermination of values
-      input = Inspec::InputRegistry.register_input(name, @profile_id, options)
-      input.value = @conf['inputs'][name] unless @conf['inputs'].nil? || @conf['inputs'][name].nil?
-      input.value
+    def register_attribute(name, options = {})
+      # we need to return an attribute object, to allow dermination of default values
+      attr = Attribute.new(name, options)
+      # read value from given gived values
+      attr.value = @conf['attributes'][attr.name] unless @conf['attributes'].nil?
+      @attributes.push(attr)
+      attr.value
     end
 
     def set_header(field, val)

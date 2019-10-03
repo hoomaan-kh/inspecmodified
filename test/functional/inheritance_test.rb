@@ -6,7 +6,7 @@ require 'functional/helper'
 describe 'example inheritance profile' do
   include FunctionalHelper
   let(:path) { File.join(examples_path, 'inheritance') }
-  let(:input_file) { File.join(examples_path, 'profile-attribute.yml') } # TODO rename attributes in examples
+  let(:attrs) { File.join(examples_path, 'profile-attribute.yml') }
 
   it 'check succeeds with --profiles-path' do
     out = inspec('check ' + path + ' --profiles-path ' + examples_path)
@@ -16,35 +16,28 @@ describe 'example inheritance profile' do
   end
 
   it 'check succeeds without --profiles-path using inspec.yml' do
-    prepare_examples('inheritance') do |dir|
-      out = inspec('vendor ' + dir)
-      out = inspec('check ' + dir)
-      out.stderr.must_equal ''
-      out.stdout.must_match(/Valid.*true/)
-      out.exit_status.must_equal 0
-    end
+    out = inspec('check ' + path)
+    out.stderr.must_equal ''
+    out.stdout.must_match(/Valid.*true/)
+    out.exit_status.must_equal 0
   end
 
   it 'archive is successful with --profiles-path' do
-    prepare_examples('inheritance') do |dir|
-      out = inspec('archive ' + dir + ' --output ' + dst.path + ' --profiles-path ' + examples_path)
-      out.stderr.must_equal ''
-      out.stdout.must_include 'Generate archive '+ dst.path
-      out.stdout.must_include 'Finished archive generation.'
-      out.exit_status.must_equal 0
-      File.exist?(dst.path).must_equal true
-    end
+    out = inspec('archive ' + path + ' --output ' + dst.path + ' --profiles-path ' + examples_path)
+    out.stderr.must_equal ''
+    out.stdout.must_include 'Generate archive '+dst.path
+    out.stdout.must_include 'Finished archive generation.'
+    out.exit_status.must_equal 0
+    File.exist?(dst.path).must_equal true
   end
 
   it 'archive is successful without --profiles-path using inspec.yml' do
-    prepare_examples('inheritance') do |dir|
-      out = inspec('archive ' + dir + ' --output ' + dst.path)
-      out.stderr.must_equal ''
-      out.stdout.must_include 'Generate archive ' + dst.path
-      out.stdout.must_include 'Finished archive generation.'
-      out.exit_status.must_equal 0
-      File.exist?(dst.path).must_equal true
-    end
+    out = inspec('archive ' + path + ' --output ' + dst.path)
+    out.stderr.must_equal ''
+    out.stdout.must_include 'Generate archive '+dst.path
+    out.stdout.must_include 'Finished archive generation.'
+    out.exit_status.must_equal 0
+    File.exist?(dst.path).must_equal true
   end
 
   it 'read the profile json with --profiles-path' do
@@ -68,9 +61,9 @@ describe 'example inheritance profile' do
   end
 
   it 'can execute a profile inheritance' do
-    out = inspec('exec ' + path + ' --reporter json --no-create-lockfile --input-file ' + input_file)
+    out = inspec('exec ' + path + ' --reporter json --no-create-lockfile --attrs ' + attrs)
     out.stderr.must_equal ''
-    out.exit_status.must_equal 101
+    out.exit_status.must_equal 0
     JSON.load(out.stdout).must_be_kind_of Hash
   end
 end

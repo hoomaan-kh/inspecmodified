@@ -158,19 +158,6 @@ describe service("avahi-daemon").info[\'properties\'][\'UnitFileState\'] do
 end
 '.strip
     end
-
-   it 'constructs a simple resource + only_if' do
-      obj.qualifier = [['resource'], ['version']]
-      obj.matcher = 'cmp >='
-      obj.expectation = '2.4.2'
-      obj.only_if = "package('ntp').installed?"
-      obj.to_ruby.must_equal '
-only_if { package(\'ntp\').installed? }
-describe resource do
-  its("version") { should cmp >= "2.4.2" }
-end
-'.strip
-    end
   end
 
 
@@ -287,52 +274,16 @@ end
       control.add_test(obj1)
       control.id = 'sample.control.id'
       control.title = 'Sample Control Important Title'
-      control.descriptions = {
-        default: 'The most critical control the world has ever seen',
-        rationale: 'It is needed to save the planet',
-        'more info': 'Insert clever joke here',
-      }
+      control.desc = 'The most critical control the world has ever seen'
       control.refs = ['simple ref', {ref: 'title', url: 'my url'}]
       control.impact = 1.0
       control.to_ruby.must_equal '
 control "sample.control.id" do
   title "Sample Control Important Title"
   desc  "The most critical control the world has ever seen"
-  desc  "rationale", "It is needed to save the planet"
-  desc  "more info", "Insert clever joke here"
   impact 1.0
   ref   "simple ref"
   ref   ({:ref=>"title", :url=>"my url"})
-  describe command("ls /etc") do
-    its("exit_status") { should eq 0 }
-  end
-end
-'.strip
-    end
-
-    it 'constructs a control with only_if' do
-      control = Inspec::Control.new
-      control.add_test(obj1)
-      control.only_if = "package('ntp').installed?"
-      control.id = 'sample.control.id'
-      control.title = 'Sample Control Important Title'
-      control.descriptions = {
-        default: 'The most critical control the world has ever seen',
-        rationale: 'It is needed to save the planet',
-        'more info': 'Insert clever joke here',
-      }
-      control.refs = ['simple ref', {ref: 'title', url: 'my url'}]
-      control.impact = 1.0
-      control.to_ruby.must_equal '
-control "sample.control.id" do
-  title "Sample Control Important Title"
-  desc  "The most critical control the world has ever seen"
-  desc  "rationale", "It is needed to save the planet"
-  desc  "more info", "Insert clever joke here"
-  impact 1.0
-  ref   "simple ref"
-  ref   ({:ref=>"title", :url=>"my url"})
-  only_if { package(\'ntp\').installed? }
   describe command("ls /etc") do
     its("exit_status") { should eq 0 }
   end
@@ -342,7 +293,7 @@ end
 
     it 'constructs a multiline desc in a control with indentation' do
       control = Inspec::Control.new
-      control.descriptions[:default] = "Multiline\n  control"
+      control.desc = "Multiline\n  control"
       control.to_ruby.must_equal '
 control nil do
   desc  "
@@ -360,16 +311,16 @@ control nil do
 end
 '.strip
 
-      control.descriptions[:default] = ''
+      control.desc = ''
       control.to_ruby.must_equal x
 
-      control.descriptions[:default] = nil
+      control.desc = nil
       control.to_ruby.must_equal x
     end
 
     it 'handles non-string descriptions' do
       control = Inspec::Control.new
-      control.descriptions[:default] = 123
+      control.desc = 123
       control.to_ruby.must_equal '
 control nil do
   desc  "123"
@@ -401,7 +352,7 @@ end
 
       control.id = 'variable.control.id'
       control.title = 'Variable Control Important Title'
-      control.descriptions[:default] = 'The most variable control the world has ever seen'
+      control.desc = 'The most variable control the world has ever seen'
       control.impact = 1.0
       control.to_ruby.must_equal '
 control "variable.control.id" do
@@ -490,7 +441,7 @@ end
       control_hash = {
         id:"tag.control.id",
         title: nil,
-        descriptions: {},
+        desc: nil,
         impact: nil,
         tests: [],
         tags:[{
@@ -508,6 +459,7 @@ end
         }]
       }
       control.to_hash.must_equal control_hash
+
     end
   end
 end

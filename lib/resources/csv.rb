@@ -1,4 +1,6 @@
 # encoding: utf-8
+# author: Christoph Hartmann
+# author: Dominik Richter
 
 # Parses a csv document
 # This implementation was inspired by a blog post
@@ -7,11 +9,11 @@ module Inspec::Resources
   class CsvConfig < JsonConfig
     name 'csv'
     desc 'Use the csv InSpec audit resource to test configuration data in a CSV file.'
-    example <<~EXAMPLE
+    example "
       describe csv('example.csv') do
         its('name') { should eq(['John', 'Alice']) }
       end
-    EXAMPLE
+    "
 
     # override the parse method from JsonConfig
     # Assuming a header row of name,col1,col2, it will output an array of hashes like so:

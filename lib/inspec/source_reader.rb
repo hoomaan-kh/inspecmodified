@@ -2,7 +2,8 @@
 # author: Dominik Richter
 # author: Christoph Hartmann
 
-require 'inspec/plugin/v1'
+require 'inspec/plugins'
+require 'utils/plugin_registry'
 
 module Inspec
   # Pre-checking of target resolution. Make sure that SourceReader plugins

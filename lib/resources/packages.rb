@@ -1,14 +1,15 @@
 # encoding: utf-8
 # copyright: 2017, Chef Software, Inc. <legal@chef.io>
+# author: Joshua Timberman
+# author: Alex Pop
 
 require 'utils/filter'
 
 module Inspec::Resources
   class Packages < Inspec.resource(1)
     name 'packages'
-    supports platform: 'unix'
     desc 'Use the packages InSpec audit resource to test properties for multiple packages installed on the system'
-    example <<~EXAMPLE
+    example "
       describe packages(/xserver-xorg.*/) do
         its('entries') { should be_empty }
       end
@@ -18,7 +19,7 @@ module Inspec::Resources
       describe packages(/vi.+/).where { status != 'installed' } do
         its('statuses') { should be_empty }
       end
-    EXAMPLE
+    "
 
     def initialize(pattern)
       os = inspec.os
@@ -42,11 +43,13 @@ module Inspec::Resources
     end
 
     filter = FilterTable.create
-    filter.register_column(:statuses,  field: 'status', style: :simple)
-          .register_column(:names,     field: 'name')
-          .register_column(:versions,  field: 'version')
-          .register_column(:architectures, field: 'architecture')
-          .install_filter_methods_on_resource(self, :filtered_packages)
+    filter.add_accessor(:where)
+          .add_accessor(:entries)
+          .add(:statuses,  field: 'status', style: :simple)
+          .add(:names,     field: 'name')
+          .add(:versions,  field: 'version')
+          .add(:architectures, field: 'architecture')
+          .connect(self, :filtered_packages)
 
     private
 

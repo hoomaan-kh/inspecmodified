@@ -1,6 +1,5 @@
 ---
 title: About the postgres_hba_conf Resource
-platform: linux
 ---
 
 # postgres\_hba\_conf
@@ -8,16 +7,6 @@ platform: linux
 Use the `postgres_hba_conf` InSpec audit resource to test the client authentication data defined in the pg_hba.conf file.
 
 <br>
-
-## Availability
-
-### Installation
-
-This resource is distributed along with InSpec itself. You can use it automatically.
-
-### Version
-
-This resource first became available in v1.31.0 of InSpec.
 
 ## Syntax
 
@@ -35,13 +24,13 @@ where
 
 <br>
 
-## Properties
+## Supported Properties
 
     'address', 'auth_method', 'auth_params', 'conf_dir' , 'conf_file' , 'database', 'params' ,'type', 'user'
 
 <br>
 
-## Property Examples
+## Property Examples and Return Types
 
 ### address([String])
 
@@ -87,7 +76,7 @@ where
 
 ## Matchers
 
-This InSpec audit resource matches any service that is listed in the HBA configuration file. For a full list of available matchers, please visit our [matchers page](https://www.inspec.io/docs/reference/matchers/).
+This InSpec audit resource matches any service that is listed in the HBA configuration file. For a full list of available matchers please visit our [matchers page](https://www.inspec.io/docs/reference/matchers/).
 
     its('auth_method') { should_not cmp 'peer' }
 

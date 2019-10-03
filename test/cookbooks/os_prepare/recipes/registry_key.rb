@@ -1,3 +1,4 @@
+# encoding: utf-8
 # author: Alex Pop
 # author: Christoph Hartmann
 #
@@ -22,10 +23,6 @@ if node['platform_family'] == 'windows'
       :name => 'dword value',
       :type => :dword,
       :data => 0
-    },{
-      :name => 'big dword value',
-      :type => :dword,
-      :data => 2147483648
     },{
       :name => 'qword value',
       :type => :qword,

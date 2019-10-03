@@ -1,6 +1,5 @@
 ---
 title: About the gem Resource
-platform: os
 ---
 
 # gem
@@ -8,16 +7,6 @@ platform: os
 Use the `gem` InSpec audit resource to test if a global Gem package is installed.
 
 <br>
-
-## Availability
-
-### Installation
-
-This resource is distributed along with InSpec itself. You can use it automatically.
-
-### Version
-
-This resource first became available in v1.0.0 of InSpec.
 
 ## Syntax
 
@@ -46,15 +35,6 @@ The following examples show how to use this InSpec audit resource.
       its('version') { should eq '0.33.0' }
     end
 
-### Verify that a particular version is installed when there are multiple versions installed
-
-    describe gem('rubocop') do
-      it { should be_installed }
-      its('versions') { should include /0.51.0/ }
-      its('versions.count') { should_not be > 3 }
-    end
-
-
 ### Verify that a gem package is not installed
 
     describe gem('rubocop') do
@@ -81,24 +61,9 @@ The following examples show how to use this InSpec audit resource.
 
 <br>
 
-## Properties
-
-### version (String)
-
-The `version` property returns a string of the default version on the system:
-
-    its('version') { should eq '0.33.0' }
-
-### versions
-
-The `versions` property returns an array of strings of all the versions of the gem installed on the system:
-
-    its('versions') { should include /0.33/ }
-
-
 ## Matchers
 
-For a full list of available matchers, please visit our [matchers page](https://www.inspec.io/docs/reference/matchers/).
+For a full list of available matchers please visit our [matchers page](https://www.inspec.io/docs/reference/matchers/). 
 
 ### be_installed
 
@@ -106,3 +71,8 @@ The `be_installed` matcher tests if the named Gem package is installed:
 
     it { should be_installed }
 
+### version
+
+The `version` matcher tests if the named package version is on the system:
+
+    its('version') { should eq '0.33.0' }

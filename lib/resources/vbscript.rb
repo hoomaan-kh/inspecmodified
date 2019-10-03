@@ -1,4 +1,6 @@
 # encoding: utf-8
+# author: Christoph Hartmann
+# author: Dominik Richter
 
 require 'securerandom'
 
@@ -21,9 +23,8 @@ module Inspec::Resources
   # @see https://msdn.microsoft.com/en-us/library/aa364991.aspx
   class VBScript < PowershellScript
     name 'vbscript'
-    supports platform: 'windows'
     desc ''
-    example <<~EXAMPLE
+    example "
       script = <<-EOH
         # you vbscript
       EOH
@@ -31,9 +32,10 @@ module Inspec::Resources
       describe vbscript(script) do
         its('stdout') { should eq 'output' }
       end
-    EXAMPLE
+    "
 
     def initialize(vbscript)
+      return skip_resource 'The `vbscript` resource is not supported on your OS yet.' unless inspec.os.windows?
       @seperator = SecureRandom.uuid
       cmd = <<~EOH
         $vbscript = @"

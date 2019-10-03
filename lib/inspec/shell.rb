@@ -47,6 +47,7 @@ module Inspec
       Pry.hooks.add_hook(:before_session, 'inspec_intro') do
         intro
         print_target_info
+        puts
       end
 
       # Track the rules currently registered and what their merge count is.
@@ -80,6 +81,19 @@ module Inspec
       "\e[1m\e[39m#{x}\e[0m"
     end
 
+    def print_example(example)
+      # determine min whitespace that can be removed
+      min = nil
+      example.lines.each do |line|
+        if !line.strip.empty? # ignore empty lines
+          line_whitespace = line.length - line.lstrip.length
+          min = line_whitespace if min.nil? || line_whitespace < min
+        end
+      end
+      # remove whitespace from each line
+      example.gsub(/\n\s{#{min}}/, "\n")
+    end
+
     def intro
       puts 'Welcome to the interactive InSpec Shell'
       puts "To find out how to use it, type: #{mark 'help'}"
@@ -91,7 +105,9 @@ module Inspec
       puts <<~EOF
         You are currently running on:
 
-        #{Inspec::BaseCLI.format_platform_info(params: ctx.platform.params, indent: 4, color: 39)}
+            OS platform: #{mark ctx.os[:name] || 'unknown'}
+            OS family: #{mark ctx.os[:family] || 'unknown'}
+            OS release: #{mark ctx.os[:release] || 'unknown'}
       EOF
     end
 
@@ -129,8 +145,8 @@ module Inspec
         end
 
         unless topic_info.example.nil?
-          info += "#{mark 'Example:'}\n\n"
-          info += "#{topic_info.example}\n\n"
+          info += "#{mark 'Example:'}\n"
+          info += "#{print_example(topic_info.example)}\n\n"
         end
 
         info += "#{mark 'Web Reference:'}\n\n"

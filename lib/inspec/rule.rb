@@ -32,38 +32,22 @@ module Inspec
     def initialize(id, profile_id, opts, &block)
       @impact = nil
       @title = nil
-      @descriptions = {}
+      @desc = nil
       @refs = []
       @tags = {}
 
       # not changeable by the user:
-      @__code = nil
       @__block = block
       @__source_location = __get_block_source_location(&block)
       @__rule_id = id
       @__profile_id = profile_id
       @__checks = []
-      @__skip_rule = {}
+      @__skip_rule = nil
       @__merge_count = 0
-      @__merge_changes = []
       @__skip_only_if_eval = opts[:skip_only_if_eval]
 
       # evaluate the given definition
-      return unless block_given?
-      begin
-        instance_eval(&block)
-      rescue StandardError => e
-        # We've encountered an exception while trying to eval the code inside the
-        # control block. We need to prevent the exception from bubbling up, and
-        # fail the control. Controls are failed by having a failed resource within
-        # them; but since our control block is unsafe (and opaque) to us, let's
-        # make a dummy and fail that.
-        location = block.source_location.compact.join(':')
-        describe 'Control Source Code Error' do
-          # Rubocop thinks we are raising an exception - we're actually calling RSpec's fail()
-          its(location) { fail e.message } # rubocop: disable Style/SignalException
-        end
-      end
+      instance_eval(&block) if block_given?
     end
 
     def to_s
@@ -76,12 +60,7 @@ module Inspec
     end
 
     def impact(v = nil)
-      if v.is_a?(String)
-        @impact = Inspec::Impact.impact_from_string(v)
-      elsif !v.nil?
-        @impact = v
-      end
-
+      @impact = v unless v.nil?
       @impact
     end
 
@@ -90,18 +69,9 @@ module Inspec
       @title
     end
 
-    def desc(v = nil, data = nil)
-      return @descriptions[:default] if v.nil?
-      if data.nil?
-        @descriptions[:default] = unindent(v)
-      else
-        @descriptions[v.to_sym] = unindent(data)
-      end
-    end
-
-    def descriptions(description_hash = nil)
-      return @descriptions if description_hash.nil?
-      @descriptions.merge!(description_hash)
+    def desc(v = nil)
+      @desc = unindent(v) unless v.nil?
+      @desc
     end
 
     def ref(ref = nil, opts = {})
@@ -133,12 +103,11 @@ module Inspec
     #
     # @param [Type] &block returns true if tests are added, false otherwise
     # @return [nil]
-    def only_if(message = nil)
+    def only_if
       return unless block_given?
       return if @__skip_only_if_eval == true
 
-      @__skip_rule[:result] ||= !yield
-      @__skip_rule[:message] = message
+      @__skip_rule ||= !yield
     end
 
     # Describe will add one or more tests to this control. There is 2 ways
@@ -190,27 +159,18 @@ module Inspec
       rule.instance_variable_get(:@__skip_rule)
     end
 
-    def self.set_skip_rule(rule, value, message = nil)
-      rule.instance_variable_set(:@__skip_rule,
-                                 { result: value, message: message })
+    def self.set_skip_rule(rule, value)
+      rule.instance_variable_set(:@__skip_rule, value)
     end
 
     def self.merge_count(rule)
       rule.instance_variable_get(:@__merge_count)
     end
 
-    def self.merge_changes(rule)
-      rule.instance_variable_get(:@__merge_changes)
-    end
-
     def self.prepare_checks(rule)
-      skip_check = skip_status(rule)
-      return checks(rule) unless skip_check[:result].eql?(true)
-      if skip_check[:message]
-        msg = "Skipped control due to only_if condition: #{skip_check[:message]}"
-      else
-        msg = 'Skipped control due to only_if condition.'
-      end
+      msg = skip_status(rule)
+      return checks(rule) unless msg
+      msg = 'Skipped control due to only_if condition.' if msg == true
 
       # TODO: we use os as the carrier here, but should consider
       # a separate resource to do skipping
@@ -219,7 +179,7 @@ module Inspec
       [['describe', [resource], nil]]
     end
 
-    def self.merge(dst, src) # rubocop:disable Metrics/AbcSize
+    def self.merge(dst, src)
       if src.id != dst.id
         # TODO: register an error, this case should not happen
         return
@@ -231,28 +191,18 @@ module Inspec
         return
       end
       # merge all fields
-      dst.impact(src.impact)                 unless src.impact.nil?
-      dst.title(src.title)                   unless src.title.nil?
-      dst.descriptions(src.descriptions)     unless src.descriptions.nil?
-      dst.tag(src.tag)                       unless src.tag.nil?
-      dst.ref(src.ref)                       unless src.ref.nil?
-
+      dst.impact(src.impact) unless src.impact.nil?
+      dst.title(src.title)   unless src.title.nil?
+      dst.desc(src.desc)     unless src.desc.nil?
       # merge indirect fields
       # checks defined in the source will completely eliminate
       # all checks that were defined in the destination
       sc = checks(src)
       dst.instance_variable_set(:@__checks, sc) unless sc.empty?
-      skip_check = skip_status(src)
-      sr = skip_check[:result]
-      msg = skip_check[:message]
-      set_skip_rule(dst, sr, msg) unless sr.nil?
-
-      # Save merge history
+      sr = skip_status(src)
+      set_skip_rule(dst, sr) unless sr.nil?
+      # increment merge count
       dst.instance_variable_set(:@__merge_count, merge_count(dst) + 1)
-      dst.instance_variable_set(
-        :@__merge_changes,
-        merge_changes(dst) << src.instance_variable_get(:@__source_location),
-      )
     end
 
     private

@@ -1,5 +1,7 @@
 # encoding: utf-8
 # copyright: 2015, Chef Software Inc.
+# author: Dominik Richter
+# author: Christoph Hartmann
 
 require 'sslshake'
 require 'utils/filter'
@@ -9,14 +11,12 @@ require 'parallel'
 # Custom resource based on the InSpec resource DSL
 class SSL < Inspec.resource(1)
   name 'ssl'
-  supports platform: 'unix'
-  supports platform: 'windows'
 
   desc "
     SSL test resource
   "
 
-  example <<~EXAMPLE
+  example "
     describe ssl(port: 443) do
       it { should be_enabled }
     end
@@ -30,7 +30,7 @@ class SSL < Inspec.resource(1)
     describe ssl(port: 443).ciphers(/rc4/i) do
       it { should_not be_enabled }
     end
-  EXAMPLE
+  "
 
   VERSIONS = [
     'ssl2',
@@ -58,13 +58,15 @@ class SSL < Inspec.resource(1)
   end
 
   filter = FilterTable.create
-  filter.register_custom_matcher(:enabled?) do |x|
+  filter.add(:enabled?) do |x|
     raise 'Cannot determine host for SSL test. Please specify it or use a different target.' if x.resource.host.nil?
     x.handshake.values.any? { |i| i['success'] }
   end
-  filter.register_column(:ciphers, field: 'cipher')
-        .register_column(:protocols, field: 'protocol')
-        .register_custom_property(:handshake) { |x|
+  filter.add_accessor(:where)
+        .add_accessor(:entries)
+        .add(:ciphers, field: 'cipher')
+        .add(:protocols, field: 'protocol')
+        .add(:handshake) { |x|
           groups = x.entries.group_by(&:protocol)
           res = Parallel.map(groups, in_threads: 8) do |proto, e|
             [proto, SSLShake.hello(x.resource.host, port: x.resource.port,
@@ -73,7 +75,7 @@ class SSL < Inspec.resource(1)
           end
           Hash[res]
         }
-        .install_filter_methods_on_resource(self, :scan_config)
+        .connect(self, :scan_config)
 
   def to_s
     "SSL/TLS on #{@host}:#{@port}"

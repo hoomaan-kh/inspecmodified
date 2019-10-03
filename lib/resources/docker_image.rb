@@ -1,6 +1,10 @@
 # encoding: utf-8
 #
 # Copyright 2017, Christoph Hartmann
+#
+# author: Christoph Hartmann
+# author: Patrick Muench
+# author: Dominik Richter
 
 require_relative 'docker_object'
 
@@ -9,9 +13,8 @@ module Inspec::Resources
     include Inspec::Resources::DockerObject
 
     name 'docker_image'
-    supports platform: 'unix'
     desc ''
-    example <<~EXAMPLE
+    example "
       describe docker_image('alpine:latest') do
         it { should exist }
         its('id') { should_not eq '' }
@@ -27,7 +30,7 @@ module Inspec::Resources
       describe docker_image(id: '4a415e366388') do
         it { should exist }
       end
-    EXAMPLE
+    "
 
     def initialize(opts = {})
       # do sanitizion of input values

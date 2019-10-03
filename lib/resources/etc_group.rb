@@ -1,5 +1,7 @@
 # encoding: utf-8
 # copyright: 2015, Vulcano Security GmbH
+# author: Christoph Hartmann
+# author: Dominik Richter
 
 # The file format consists of
 # - group name
@@ -20,7 +22,6 @@
 
 require 'utils/convert'
 require 'utils/parser'
-require 'utils/file_reader'
 
 module Inspec::Resources
   class EtcGroup < Inspec.resource(1)
@@ -28,22 +29,23 @@ module Inspec::Resources
     include CommentParser
 
     name 'etc_group'
-    supports platform: 'unix'
     desc 'Use the etc_group InSpec audit resource to test groups that are defined on Linux and UNIX platforms. The /etc/group file stores details about each group---group name, password, group identifier, along with a comma-separate list of users that belong to the group.'
-    example <<~EXAMPLE
+    example "
       describe etc_group do
         its('gids') { should_not contain_duplicates }
         its('groups') { should include 'my_user' }
         its('users') { should include 'my_user' }
       end
-    EXAMPLE
-
-    include FileReader
+    "
 
     attr_accessor :gid, :entries
     def initialize(path = nil)
       @path = path || '/etc/group'
       @entries = parse_group(@path)
+
+      # skip resource if it is not supported on current OS
+      return skip_resource 'The `etc_group` resource is not supported on your OS.' \
+      unless inspec.os.unix?
     end
 
     def groups(filter = nil)
@@ -78,12 +80,10 @@ module Inspec::Resources
       }
       res = entries
 
-      unless res.nil?
-        conditions.each do |k, v|
-          idx = fields[k.to_sym]
-          next if idx.nil?
-          res = res.select { |x| x[idx].to_s == v.to_s }
-        end
+      conditions.each do |k, v|
+        idx = fields[k.to_sym]
+        next if idx.nil?
+        res = res.select { |x| x[idx].to_s == v.to_s }
       end
 
       EtcGroupView.new(self, res)
@@ -96,8 +96,11 @@ module Inspec::Resources
     private
 
     def parse_group(path)
-      @content = read_file_content(path, allow_empty: true)
-
+      @content = inspec.file(path).content
+      if @content.nil?
+        skip_resource "Can't access group file in #{path}"
+        return []
+      end
       # iterate over each line and filter comments
       @content.split("\n").each_with_object([]) do |line, lines|
         grp_info = parse_group_line(line)

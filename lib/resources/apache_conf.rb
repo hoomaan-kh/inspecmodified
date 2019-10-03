@@ -1,24 +1,24 @@
 # encoding: utf-8
 # copyright: 2015, Vulcano Security GmbH
+# author: Dominik Richter
+# author: Christoph Hartmann
 
 require 'utils/simpleconfig'
 require 'utils/find_files'
-require 'utils/file_reader'
 
 module Inspec::Resources
   class ApacheConf < Inspec.resource(1)
     name 'apache_conf'
-    supports platform: 'linux'
-    supports platform: 'debian'
+    supports os_family: 'linux'
+    supports os_family: 'debian'
     desc 'Use the apache_conf InSpec audit resource to test the configuration settings for Apache. This file is typically located under /etc/apache2 on the Debian and Ubuntu platforms and under /etc/httpd on the Fedora, CentOS, Red Hat Enterprise Linux, and Arch Linux platforms. The configuration settings may vary significantly from platform to platform.'
-    example <<~EXAMPLE
+    example "
       describe apache_conf do
         its('setting_name') { should eq 'value' }
       end
-    EXAMPLE
+    "
 
     include FindFiles
-    include FileReader
 
     attr_reader :conf_path
 
@@ -65,7 +65,16 @@ module Inspec::Resources
       @content = ''
       @params = {}
 
-      read_file_content(conf_path)
+      # skip if the main configuration file doesn't exist
+      file = inspec.file(conf_path)
+      if !file.file?
+        return skip_resource "Can't find file \"#{conf_path}\""
+      end
+
+      raw_conf = file.content
+      if raw_conf.empty? && !file.empty?
+        return skip_resource("Can't read file \"#{conf_path}\"")
+      end
 
       to_read = [conf_path]
       until to_read.empty?
@@ -82,17 +91,9 @@ module Inspec::Resources
         # The regex is terminated by an expression that matches zero or more spaces.
         params = SimpleConfig.new(
           raw_conf,
-          assignment_regex: /^\s*(\S+)\s+['"]*((?=.*\s+$).*?|.*?)['"]*\s*$/,
+          assignment_regex: /^\s*(\S+)\s+((?=.*\s+$).*?|.*)\s*$/,
           multiple_values: true,
         ).params
-
-        # Capture any characters between quotes that are not escaped in values
-        params.values.map! do |value|
-          value.map! do |sub_value|
-            sub_value[/(?<=["|'])(?:\\.|[^"'\\])*(?=["|'])/] || sub_value
-          end
-        end
-
         @params.merge!(params)
 
         to_read = to_read.drop(1)
@@ -125,7 +126,7 @@ module Inspec::Resources
     end
 
     def read_file(path)
-      @files_contents[path] ||= read_file_content(path, true)
+      @files_contents[path] ||= inspec.file(path).content
     end
 
     def conf_dir

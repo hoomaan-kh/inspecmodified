@@ -7,8 +7,7 @@ license: Apache-2.0
 summary: Demonstrates the use of InSpec profile inheritance
 version: 1.0.0
 supports:
-  - platform-family: unix
-  - platform-family: windows
+  - os-family: unix
 depends:
   - name: profile
     path: ../profile

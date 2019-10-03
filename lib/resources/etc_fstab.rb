@@ -1,15 +1,14 @@
 # encoding: utf-8
 # copyright:
+# author: Matthew Dromazos
 
 require 'utils/parser'
-require 'utils/file_reader'
 
 module Inspec::Resources
   class EtcFstab < Inspec.resource(1)
     name 'etc_fstab'
-    supports platform: 'unix'
     desc 'Use the etc_fstab InSpec audit resource to check the configuration of the etc/fstab file.'
-    example <<~EXAMPLE
+    example "
       nfs_systems = etc_fstab.nfs_file_systems.entries
       nfs_systems.each do |file_system|
         describe file_system do
@@ -22,14 +21,14 @@ module Inspec::Resources
       describe etc_fstab do
         its ('home_mount_options') { should include 'nosuid' }
       end
-    EXAMPLE
+    "
 
     attr_reader :params
 
     include CommentParser
-    include FileReader
 
     def initialize(fstab_path = nil)
+      return skip_resource 'The `etc_fstab` resource is not supported on your OS.' unless inspec.os.linux?
       @conf_path      = fstab_path || '/etc/fstab'
       @files_contents = {}
       @content        = nil
@@ -38,15 +37,17 @@ module Inspec::Resources
     end
 
     filter = FilterTable.create
-    filter.register_column(:device_name,           field: 'device_name')
-          .register_column(:mount_point,           field: 'mount_point')
-          .register_column(:file_system_type,      field: 'file_system_type')
-          .register_column(:mount_options,         field: 'mount_options')
-          .register_column(:dump_options,          field: 'dump_options')
-          .register_column(:file_system_options,   field: 'file_system_options')
-          .register_custom_matcher(:configured?) { |x| x.entries.any? }
+    filter.add_accessor(:where)
+          .add_accessor(:entries)
+          .add(:device_name,           field: 'device_name')
+          .add(:mount_point,           field: 'mount_point')
+          .add(:file_system_type,      field: 'file_system_type')
+          .add(:mount_options,         field: 'mount_options')
+          .add(:dump_options,          field: 'dump_options')
+          .add(:file_system_options,   field: 'file_system_options')
+          .add(:configured?) { |x| x.entries.any? }
 
-    filter.install_filter_methods_on_resource(self, :params)
+    filter.connect(self, :params)
 
     def nfs_file_systems
       where { file_system_type.match(/nfs/) }
@@ -86,7 +87,16 @@ module Inspec::Resources
     end
 
     def read_file(conf_path = @conf_path)
-      read_file_content(conf_path).lines
+      file = inspec.file(conf_path)
+      if !file.file?
+        return skip_resource "Can't find \"#{@conf_path}\""
+      end
+
+      raw_conf = file.content
+      if raw_conf.empty? && !file.empty?
+        return skip_resource("File is empty or unable to read file at path:\"#{@conf_path}\"")
+      end
+      raw_conf.lines
     end
   end
 end

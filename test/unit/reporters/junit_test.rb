@@ -2,9 +2,9 @@
 
 require 'helper'
 
-describe Inspec::Reporters::Junit do
+describe Inspec::Reporters::Json do
   let(:path) { File.expand_path(File.dirname(__FILE__)) }
-  let(:report) do
+  let(:report) do 
     data = JSON.parse(File.read(path + '/../mock/reporters/run_data.json'), symbolize_names: true)
     Inspec::Reporters::Junit.new({ run_data: data })
   end

@@ -1,6 +1,5 @@
 ---
 title: About the service Resource
-platform: os
 ---
 
 # service
@@ -10,16 +9,6 @@ Use the `service` InSpec audit resource to test if the named service is installe
 Under some circumstances, it may be necessary to specify the service manager by using one of the following service manager-specific resources: `bsd_service`, `launchd_service`, `runit_service`, `systemd_service`, `sysv_service`, or `upstart_service`. These resources are based on the `service` resource.
 
 <br>
-
-## Availability
-
-### Installation
-
-This resource is distributed along with InSpec itself. You can use it automatically.
-
-### Version
-
-This resource first became available in v1.0.0 of InSpec.
 
 ## Syntax
 
@@ -110,7 +99,7 @@ This is also possible with `systemd_service`, `runit_service`, `sysv_service`, `
 
 ## Matchers
 
-For a full list of available matchers, please visit our [matchers page](https://www.inspec.io/docs/reference/matchers/).
+For a full list of available matchers please visit our [matchers page](https://www.inspec.io/docs/reference/matchers/). 
 
 ### be_enabled
 

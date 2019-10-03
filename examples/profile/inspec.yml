@@ -7,5 +7,4 @@ license: Apache-2.0
 summary: Demonstrates the use of InSpec Compliance Profile
 version: 1.0.0
 supports:
-  - platform-family: unix
-  - platform-family: windows
+  - os-family: unix

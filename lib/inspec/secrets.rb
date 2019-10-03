@@ -2,7 +2,8 @@
 # author: Christoph Hartmann
 # author: Dominik Richter
 
-require 'inspec/plugin/v1'
+require 'inspec/plugins'
+require 'utils/plugin_registry'
 
 module Inspec
   SecretsBackend = PluginRegistry.new

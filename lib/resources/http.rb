@@ -1,18 +1,17 @@
 # encoding: utf-8
 # copyright: 2017, Criteo
 # copyright: 2017, Chef Software Inc
+# author: Guilhem Lettron, Christoph Hartmann
 # license: Apache v2
 
 require 'faraday'
-require 'faraday_middleware'
 require 'hashie'
 
 module Inspec::Resources
   class Http < Inspec.resource(1)
     name 'http'
-    supports platform: 'unix'
     desc 'Use the http InSpec audit resource to test http call.'
-    example <<~EXAMPLE
+    example "
       describe http('http://localhost:8080/ping', auth: {user: 'user', pass: 'test'}, params: {format: 'html'}) do
         its('status') { should cmp 200 }
         its('body') { should cmp 'pong' }
@@ -23,27 +22,23 @@ module Inspec::Resources
         its('Content-Length') { should cmp 258 }
         its('Content-Type') { should cmp 'text/html; charset=UTF-8' }
       end
-    EXAMPLE
+
+      # properly execute the HTTP call on the scanned machine instead of the
+      # machine executing InSpec. This will be the default behavior in InSpec 2.0.
+      describe http('http://localhost:8080', enable_remote_worker: true) do
+        its('body') { should cmp 'local web server on target machine' }
+      end
+    "
 
     def initialize(url, opts = {})
       @url = url
       @opts = opts
 
-      # Prior to InSpec 2.0 the HTTP test had to be instructed to run on the
-      # remote target machine. This warning will be removed after a few months
-      # to give users an opportunity to remove the unused option from their
-      # profiles.
-      if opts.key?(:enable_remote_worker) && !inspec.local_transport?
-        warn 'Ignoring `enable_remote_worker` option, the `http` resource ',
-             'remote worker is enabled by default for remote targets and ',
-             'cannot be disabled'
-      end
-
-      # Run locally if InSpec is ran locally and remotely if ran remotely
-      if inspec.local_transport?
-        @worker = Worker::Local.new(http_method, url, opts)
-      else
+      if use_remote_worker?
+        return skip_resource 'curl is not available on the target machine' unless inspec.command('curl').exist?
         @worker = Worker::Remote.new(inspec, http_method, url, opts)
+      else
+        @worker = Worker::Local.new(http_method, url, opts)
       end
     end
 
@@ -64,11 +59,18 @@ module Inspec::Resources
     end
 
     def to_s
-      if @opts and @url
-        "HTTP #{http_method} on #{@url}"
-      else
-        'HTTP Resource'
-      end
+      "http #{http_method} on #{@url}"
+    end
+
+    private
+
+    def use_remote_worker?
+      return false if inspec.local_transport?
+      return true if @opts[:enable_remote_worker]
+
+      warn "[DEPRECATION] #{self} will execute locally instead of the target machine. To execute remotely, add `enable_remote_worker: true`."
+      warn '[DEPRECATION] `enable_remote_worker: true` will be the default behavior in InSpec 2.0.'
+      false
     end
 
     class Worker
@@ -79,7 +81,6 @@ module Inspec::Resources
           @http_method = http_method
           @url = url
           @opts = opts
-          @response = nil
         end
 
         private
@@ -115,10 +116,6 @@ module Inspec::Resources
         def ssl_verify?
           opts.fetch(:ssl_verify, true)
         end
-
-        def max_redirects
-          opts.fetch(:max_redirects, 0)
-        end
       end
 
       class Local < Base
@@ -138,11 +135,7 @@ module Inspec::Resources
 
         def response
           return @response if @response
-          conn = Faraday.new(url: url, headers: request_headers, params: params, ssl: { verify: ssl_verify? }) do |builder|
-            builder.request :url_encoded
-            builder.use FaradayMiddleware::FollowRedirects, limit: max_redirects if max_redirects > 0
-            builder.adapter Faraday.default_adapter
-          end
+          conn = Faraday.new url: url, headers: request_headers, params: params, ssl: { verify: ssl_verify? }
 
           # set basic authentication
           conn.basic_auth username, password unless username.nil? || password.nil?
@@ -151,7 +144,7 @@ module Inspec::Resources
           conn.options.timeout      = read_timeout  # open/read timeout in seconds
           conn.options.open_timeout = open_timeout  # connection open timeout in seconds
 
-          @response = conn.run_request(http_method.downcase.to_sym, nil, nil, nil) do |req|
+          @response = conn.send(http_method.downcase) do |req|
             req.body = request_body
           end
         end
@@ -161,12 +154,6 @@ module Inspec::Resources
         attr_reader :inspec
 
         def initialize(inspec, http_method, url, opts)
-          unless inspec.command('curl').exist?
-            raise Inspec::Exceptions::ResourceSkipped,
-                  'curl is not available on the target machine'
-          end
-
-          @ran_curl = false
           @inspec = inspec
           super(http_method, url, opts)
         end
@@ -191,21 +178,15 @@ module Inspec::Resources
         def run_curl
           return if @ran_curl
 
-          cmd_result = inspec.command(curl_command)
-          response = cmd_result.stdout
+          response = inspec.command(curl_command).stdout
           @ran_curl = true
-          return if response.nil? || cmd_result.exit_status != 0
+          return if response.nil?
 
           # strip any carriage returns to normalize output
           response.delete!("\r")
 
           # split the prelude (status line and headers) and the body
-          prelude, remainder = response.split("\n\n", 2)
-          loop do
-            break unless remainder =~ %r{^HTTP/}
-            prelude, remainder = remainder.split("\n\n", 2)
-          end
-          @body = remainder
+          prelude, @body = response.split("\n\n", 2)
           prelude = prelude.lines
 
           # grab the status off of the first line of the prelude
@@ -238,8 +219,6 @@ module Inspec::Resources
           cmd << "--user \'#{username}:#{password}\'" unless username.nil? || password.nil?
           cmd << '--insecure' unless ssl_verify?
           cmd << "--data #{Shellwords.shellescape(request_body)}" unless request_body.nil?
-          cmd << '--location' if max_redirects > 0
-          cmd << "--max-redirs #{max_redirects}" if max_redirects > 0
 
           request_headers.each do |k, v|
             cmd << "-H '#{k}: #{v}'"

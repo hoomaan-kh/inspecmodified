@@ -1,6 +1,5 @@
 ---
 title: About the windows_feature Resource
-platform: windows
 ---
 
 # windows_feature
@@ -8,16 +7,6 @@ platform: windows
 Use the `windows_feature` InSpec audit resource to test features on Windows via the `Get-WindowsFeature` cmdlet.
 
 <br>
-
-## Availability
-
-### Installation
-
-This resource is distributed along with InSpec itself. You can use it automatically.
-
-### Version
-
-This resource first became available in v1.0.0 of InSpec.
 
 ## Syntax
 
@@ -38,21 +27,9 @@ where
 
 The following examples show how to use this InSpec audit resource.
 
-### Test the DHCP feature (Attempts PowerShell then DISM)
+### Test the DHCP Server feature
 
-    describe windows_feature('DHCP') do
-      it{ should be_installed }
-    end
-
-### Test the IIS-WebServer feature using DISM
-
-    describe windows_feature('IIS-WebServer', DISM) do
-      it{ should be_installed }
-    end
-
-### Test the NetFx3 feature using DISM
-
-    describe windows_feature('NetFx3', :dism) do
+    describe windows_feature('DHCP Server') do
       it{ should be_installed }
     end
 
@@ -60,7 +37,7 @@ The following examples show how to use this InSpec audit resource.
 
 ## Matchers
 
-For a full list of available matchers, please visit our [matchers page](https://www.inspec.io/docs/reference/matchers/).
+For a full list of available matchers please visit our [matchers page](https://www.inspec.io/docs/reference/matchers/). 
 
 ### be_installed
 

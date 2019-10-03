@@ -1,23 +1,12 @@
 ---
 title: About the docker_container Resource
-platform: linux
 ---
 
 # docker_container
 
-Use the `docker_container` InSpec audit resource to test a Docker container.
+Use the `docker_container` InSpec audit resource to test a docker container.
 
 <br>
-
-## Availability
-
-### Installation
-
-This resource is distributed along with InSpec itself. You can use it automatically.
-
-### Version
-
-This resource first became available in v1.21.0 of InSpec.
 
 ## Syntax
 
@@ -34,11 +23,9 @@ A `docker_container` resource block declares the configuration data to be tested
       its('command') { should eq 'nc -ll -p 1234 -e /bin/cat' }
     end
 
-<br>
+## Resource Parameter Examples 
 
-## Resource Parameter Examples
-
-### name
+### container
 
 The container name can also be passed with the `name` resource parameter:
 
@@ -46,8 +33,6 @@ The container name can also be passed with the `name` resource parameter:
       it { should exist }
       it { should be_running }
     end
-
-### id
 
 Alternatively, you can pass in the container id:
 
@@ -82,7 +67,7 @@ The `tag` property tests the value of the image tag:
 
 ### ports
 
-The `ports` property tests the value the Docker ports:
+The `ports` property tests the value the docker ports:
 
     its('ports') { should eq '0.0.0.0:1234->1234/tcp' }
 
@@ -110,4 +95,5 @@ The `command` property tests the value of the container run command:
 
 ## Matchers
 
-For a full list of available matchers, please visit our [matchers page](https://www.inspec.io/docs/reference/matchers/).
+For a full list of available matchers please visit our [matchers page](https://www.inspec.io/docs/reference/matchers/). 
+

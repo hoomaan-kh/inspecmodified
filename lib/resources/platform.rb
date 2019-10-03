@@ -4,7 +4,7 @@ module Inspec::Resources
   class PlatformResource < Inspec.resource(1)
     name 'platform'
     desc 'Use the platform InSpec resource to test the platform on which the system is running.'
-    example <<~EXAMPLE
+    example "
       describe platform do
         its('name') { should eq 'redhat' }
       end
@@ -12,25 +12,35 @@ module Inspec::Resources
       describe platform do
         it { should be_in_family('unix') }
       end
-    EXAMPLE
+    "
 
     def initialize
-      @platform = inspec.backend.platform
+      @platform = inspec.backend.os
     end
 
     # add helper methods for easy access of properties
     %w{family release arch}.each do |property|
       define_method(property.to_sym) do
-        @platform[property]
+        @platform.send(property)
       end
     end
 
-    def families
-      @platform.family_hierarchy
+    # This is a string override for platform.name.
+    # TODO: removed in inspec 2.0
+    class NameCleaned < String
+      def ==(other)
+        if other =~ /[A-Z ]/
+          cleaned = other.downcase.tr(' ', '_')
+          Inspec::Log.warn "[DEPRECATED] Platform names will become lowercase in InSpec 2.0. Please match on '#{cleaned}' instead of '#{other}'"
+          super(cleaned)
+        else
+          super(other)
+        end
+      end
     end
 
     def name
-      @platform.name
+      NameCleaned.new(@platform.name)
     end
 
     def [](key)
@@ -50,19 +60,8 @@ module Inspec::Resources
       @platform.family_hierarchy.include?(family)
     end
 
-    def params
-      h = {
-        name: name,
-        families: families,
-        release: release,
-      }
-
-      # Avoid adding Arch for APIs (not applicable)
-      unless in_family?('api')
-        h[:arch] = arch
-      end
-
-      h
+    def families
+      @platform.family_hierarchy
     end
 
     def supported?(supports)
@@ -71,7 +70,11 @@ module Inspec::Resources
       status = true
       supports.each do |s|
         s.each do |k, v|
-          if %i(os_family os-family platform_family platform-family).include?(k)
+          # ignore the inspec check for supports
+          # TODO: remove in inspec 2.0
+          if k == :inspec
+            next
+          elsif %i(os_family os-family platform_family platform-family).include?(k)
             status = in_family?(v)
           elsif %i(os platform).include?(k)
             status = platform?(v)

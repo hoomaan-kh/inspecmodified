@@ -5,29 +5,46 @@ require 'json'
 module Inspec::Reporters
   class Json < Base
     def render
-      output(report.to_json, false)
-    end
-
-    def report
-      {
+      report = {
         platform: platform,
         profiles: profiles,
-        statistics: {
-          duration: run_data[:statistics][:duration],
-        },
+        statistics: { duration: run_data[:statistics][:duration] },
         version: run_data[:version],
+        controls: controls,
+        other_checks: run_data[:other_checks],
       }
+
+      output(report.to_json)
     end
 
     private
 
     def platform
-      platform = {
+      {
         name: run_data[:platform][:name],
         release: run_data[:platform][:release],
       }
-      platform[:target_id] = @config['target_id'] if @config['target_id']
-      platform
+    end
+
+    def controls
+      controls = []
+      return controls if run_data[:controls].nil?
+
+      run_data[:controls].each do |c|
+        control = {
+          status: c[:status],
+          start_time: c[:start_time],
+          run_time: c[:run_time],
+          code_desc: c[:code_desc],
+        }
+        control[:resource] = c[:resource] if c[:resource]
+        control[:skip_message] = c[:skip_message] if c[:skip_message]
+        control[:exception] = c[:exception] if c[:exception]
+        control[:backtrace] = c[:backtrace] if c[:backtrace]
+
+        controls << control
+      end
+      controls
     end
 
     def profile_results(control)
@@ -43,9 +60,6 @@ module Inspec::Reporters
         }
         result[:resource] = r[:resource] if r[:resource]
         result[:skip_message] = r[:skip_message] if r[:skip_message]
-        result[:message] = r[:message] if r[:message]
-        result[:exception] = r[:exception] if r[:exception]
-        result[:backtrace] = r[:backtrace] if r[:backtrace]
 
         results << result
       end
@@ -60,8 +74,7 @@ module Inspec::Reporters
         control = {
           id: c[:id],
           title: c[:title],
-          desc: c.dig(:descriptions, :default),
-          descriptions: convert_descriptions(c[:descriptions]),
+          desc: c[:desc],
           impact: c[:impact],
           refs: c[:refs],
           tags: c[:tags],
@@ -107,26 +120,13 @@ module Inspec::Reporters
           copyright: p[:copyright],
           copyright_email: p[:copyright_email],
           supports: p[:supports],
-          attributes: (p[:inputs] ? p[:inputs] : p[:attributes]), # TODO: rename exposed field to inputs, see #3802
-          parent_profile: p[:parent_profile],
-          depends: p[:depends],
+          attributes: p[:attributes],
           groups: profile_groups(p),
           controls: profile_controls(p),
-          status: p[:status],
-          skip_message: p[:skip_message],
         }
         profiles << profile.reject { |_k, v| v.nil? }
       end
       profiles
-    end
-
-    def convert_descriptions(data)
-      return [] if data.nil?
-      results = []
-      data.each do |label, text|
-        results.push({ label: label.to_s, data: text })
-      end
-      results
     end
   end
 end

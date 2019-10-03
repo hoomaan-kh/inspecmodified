@@ -16,9 +16,8 @@
 module Inspec::Resources
   class IisSite < Inspec.resource(1)
     name 'iis_site'
-    supports platform: 'windows'
     desc 'Tests IIS site configuration on windows. Supported in server 2012+ only'
-    example <<~EXAMPLE
+    example "
       describe iis_site('Default Web Site') do
         it { should exist }
         it { should be_running }
@@ -27,7 +26,7 @@ module Inspec::Resources
         it { should have_binding('net.pipe *') }
         it { should have_path('C:\\inetpub\\wwwroot') }
       end
-    EXAMPLE
+    "
 
     def initialize(site_name)
       @site_name = site_name
@@ -40,19 +39,19 @@ module Inspec::Resources
     end
 
     def app_pool
-      iis_site.nil? ? nil : iis_site[:app_pool]
+      iis_site[:app_pool]
     end
 
     def bindings
-      iis_site.nil? ? nil : iis_site[:bindings]
+      iis_site[:bindings]
     end
 
     def state
-      iis_site.nil? ? nil : iis_site[:state]
+      iis_site[:state]
     end
 
     def path
-      iis_site.nil? ? nil : iis_site[:path]
+      iis_site[:path]
     end
 
     def exists?
@@ -94,7 +93,7 @@ module Inspec::Resources
 
     # want to populate everything using one powershell command here and spit it out as json
     def iis_site(name)
-      command = "Get-Website '#{name}' | Select-Object -Property Name,State,PhysicalPath,bindings,ApplicationPool | ConvertTo-Json"
+      command = "Get-Website '#{name}' | select-object -Property Name,State,PhysicalPath,bindings,ApplicationPool | ConvertTo-Json"
       cmd = @inspec.command(command)
 
       begin
@@ -103,8 +102,11 @@ module Inspec::Resources
         return nil
       end
 
-      bindings_array = site['bindings']['Collection'].map { |k|
-        "#{k['protocol']} #{k['bindingInformation']}#{k['protocol'] == 'https' ? " sslFlags=#{k['sslFlags']}" : ''}"
+      bindings_array = site['bindings']['Collection'].map { |k, _str|
+        k['protocol'] <<
+          ' ' <<
+          k['bindingInformation'] <<
+          (k['protocol'] == 'https' ? ' sslFlags=' << flags : '')
       }
 
       # map our values to a hash table
@@ -125,17 +127,17 @@ module Inspec::Resources
   class IisSiteServerSpec < IisSite
     name 'iis_website'
     desc 'Tests IIS site configuration on windows. Deprecated, use `iis_site` instead.'
-    example <<~EXAMPLE
+    example "
       describe iis_website('Default Website') do
         it{ should exist }
         it{ should be_running }
         it{ should be_in_app_pool('Default App Pool') }
       end
-    EXAMPLE
+    "
 
     def initialize(site_name)
-      Inspec.deprecate(:resource_iis_website, 'The `iis_website` resource is deprecated. Please use `iis_site` instead.')
       super(site_name)
+      warn '[DEPRECATION] `iis_website(site_name)` is deprecated.  Please use `iis_site(site_name)` instead.'
     end
 
     def in_app_pool?(app_pool)

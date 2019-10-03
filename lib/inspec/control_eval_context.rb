@@ -19,43 +19,11 @@ module Inspec
     #
     # @param [ResourcesDSL] resources_dsl which has all resources to attach
     # @return [RuleContext] the inner context of rules
-    def self.rule_context(resources_dsl, profile_id)
+    def self.rule_context(resources_dsl)
       require 'rspec/core/dsl'
       Class.new(Inspec::Rule) do
         include RSpec::Core::DSL
         with_resource_dsl resources_dsl
-
-        # allow attributes to be accessed within control blocks
-        define_method :attribute do |name|
-          Inspec::InputRegistry.find_input(name, profile_id).value
-        end
-
-        # Support for Control DSL plugins.
-        # This is called when an unknown method is encountered
-        # within a control block.
-        def method_missing(method_name, *arguments, &block)
-          # Check to see if there is a control_dsl plugin activator hook with the method name
-          registry = Inspec::Plugin::V2::Registry.instance
-          hook = registry.find_activators(plugin_type: :control_dsl, activator_name: method_name).first
-          if hook
-            # OK, load the hook if it hasn't been already.  We'll then know a module,
-            # which we can then inject into the context
-            hook.activate
-
-            # Inject the module's methods into the context.
-            # implementation_class is the field name, but this is actually a module.
-            self.class.include(hook.implementation_class)
-            # Now that the module is loaded, it defined one or more methods
-            # (presumably the one we were looking for.)
-            # We still haven't called it, so do so now.
-            send(method_name, *arguments, &block)
-          else
-            # If we couldn't find a plugin to match, maybe something up above has it,
-            # or maybe it is just a unknown method error.
-            super
-          end
-        end
-
       end
     end
 
@@ -68,9 +36,10 @@ module Inspec
     # @param outer_dsl [OuterDSLClass]
     # @return [ProfileContextClass]
     def self.create(profile_context, resources_dsl) # rubocop:disable Metrics/AbcSize, Metrics/MethodLength, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
+      rule_class = rule_context(resources_dsl)
       profile_context_owner = profile_context
       profile_id = profile_context.profile_id
-      rule_class = rule_context(resources_dsl, profile_id)
+
       Class.new do # rubocop:disable Metrics/BlockLength
         include Inspec::DSL
         include Inspec::DSL::RequireOverride
@@ -83,7 +52,6 @@ module Inspec
           @conf = conf
           @dependencies = dependencies
           @require_loader = require_loader
-          @skip_file_message = nil
           @skip_file = false
           @skip_only_if_eval = skip_only_if_eval
         end
@@ -150,49 +118,45 @@ module Inspec
 
         define_method :register_control do |control, &block|
           if @skip_file
-            ::Inspec::Rule.set_skip_rule(control, true, @skip_file_message)
+            ::Inspec::Rule.set_skip_rule(control, true)
           end
 
           unless profile_context_owner.profile_supports_platform?
             platform = inspec.platform
             msg = "Profile #{profile_context_owner.profile_id} is not supported on platform #{platform.name}/#{platform.release}."
-            ::Inspec::Rule.set_skip_rule(control, true, msg)
+            ::Inspec::Rule.set_skip_rule(control, msg)
           end
 
           unless profile_context_owner.profile_supports_inspec_version?
             msg = "Profile #{profile_context_owner.profile_id} is not supported on InSpec version (#{Inspec::VERSION})."
-            ::Inspec::Rule.set_skip_rule(control, true, msg)
+            ::Inspec::Rule.set_skip_rule(control, msg)
           end
 
           profile_context_owner.register_rule(control, &block) unless control.nil?
         end
 
-        # method for inputs; import input handling
-        define_method :attribute do |name, options = nil|
-          if options.nil?
-            Inspec::InputRegistry.find_input(name, profile_id).value
-          else
-            profile_context_owner.register_input(name, options)
-          end
+        # method for attributes; import attribute handling
+        define_method :attribute do |name, options|
+          profile_context_owner.register_attribute(name, options)
         end
 
         define_method :skip_control do |id|
           profile_context_owner.unregister_rule(id)
         end
 
-        define_method :only_if do |message = nil, &block|
+        define_method :only_if do |&block|
           return unless block
           return if @skip_file == true
           return if @skip_only_if_eval == true
 
           return if block.yield == true
+
           # Apply `set_skip_rule` for other rules in the same file
           profile_context_owner.rules.values.each do |r|
             sources_match = r.source_file == block.source_location[0]
-            Inspec::Rule.set_skip_rule(r, true, message) if sources_match
+            Inspec::Rule.set_skip_rule(r, true) if sources_match
           end
 
-          @skip_file_message = message
           @skip_file = true
         end
 

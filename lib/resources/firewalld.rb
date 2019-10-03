@@ -1,4 +1,5 @@
 # encoding: utf-8
+# author: Matthew
 
 module Inspec::Resources
   class FirewallD < Inspec.resource(1)
@@ -8,9 +9,8 @@ module Inspec::Resources
     ###
 
     name 'firewalld'
-    supports platform: 'linux'
     desc 'Use the firewalld resource to check and see if firewalld is configured to grand or deny access to specific hosts or services'
-    example <<~EXAMPLE
+    example "
       describe firewalld do
         it { should be_running }
         its('default_zone') { should eq 'public' }
@@ -23,19 +23,22 @@ module Inspec::Resources
         its('sources') { should cmp ['ssh', 'icmp'] }
         its('services') { should cmp ['192.168.1.0/24', '192.168.1.2'] }
       end
-    EXAMPLE
+    "
 
     attr_reader :params
 
     filter = FilterTable.create
-    filter.register_column(:zone,       field: 'zone')
-          .register_column(:interfaces, field: 'interfaces')
-          .register_column(:sources,    field: 'sources')
-          .register_column(:services,   field: 'services')
+    filter.add_accessor(:where)
+          .add_accessor(:entries)
+          .add(:zone,       field: 'zone')
+          .add(:interfaces, field: 'interfaces')
+          .add(:sources,    field: 'sources')
+          .add(:services,   field: 'services')
 
-    filter.install_filter_methods_on_resource(self, :params)
+    filter.connect(self, :params)
 
     def initialize
+      return skip_resource 'The `firewalld` resource is not supported on your OS.' unless inspec.os.linux?
       @params = parse_active_zones(active_zones)
     end
 

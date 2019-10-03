@@ -1,39 +1,26 @@
 # encoding: utf-8
-
-require 'shellwords'
+# author: Christoph Hartmann
+# author: Dominik Richter
 
 module Inspec::Resources
   class NpmPackage < Inspec.resource(1)
     name 'npm'
-    supports platform: 'unix'
-    supports platform: 'windows'
     desc 'Use the npm InSpec audit resource to test if a global npm package is installed. npm is the the package manager for Nodejs packages, such as bower and StatsD.'
-    example <<~EXAMPLE
+    example "
       describe npm('bower') do
         it { should be_installed }
       end
+    "
 
-      describe npm('tar', path: '/path/to/project') do
-        it { should be_installed }
-      end
-    EXAMPLE
-
-    def initialize(package_name, opts = {})
+    def initialize(package_name)
       @package_name = package_name
-      @location = opts[:path]
       @cache = nil
     end
 
     def info
       return @info if defined?(@info)
 
-      if @location
-        npm = "cd #{Shellwords.escape @location} && npm"
-      else
-        npm = 'npm -g'
-      end
-
-      cmd = inspec.command("#{npm} ls --json #{@package_name}")
+      cmd = inspec.command("npm ls -g --json #{@package_name}")
       @info = {
         name: @package_name,
         type: 'npm',

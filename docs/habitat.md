@@ -6,7 +6,7 @@ title: InSpec Integration with Habitat
 
 InSpec provides an easy method to create an executable Habitat package for an InSpec profile. When run via the Habitat Supervisor, the package will run InSpec with your profile and write out its findings to a JSON file. This provides the ability to ship your compliance controls alongside your Habitat-packaged application and continuously run InSpec, providing you *Continuous Compliance.*
 
-## What is Habitat
+## What is Habitat?
 
 Habitat by Chef is our new Application Automation tool that aims to make it easy, safe, and fast to build, deploy, and manage applications. From build dependencies, runtime dependencies, dynamic configuration, and service discovery (just to name a few), Habitat packages the automation with the application instead of relying on an underlying platform.
 
@@ -28,7 +28,7 @@ HAB_INSPEC_PROFILE_FRONTEND1="sleep_time = 60" hab start adamleff/inspec-profile
 
 The Habitat Supervisor will display output like this:
 
-```text
+```
 hab start adamleff/inspec-profile-frontend1
 ∵ Missing package for core/hab-sup/0.17.0
 » Installing core/hab-sup/0.17.0
@@ -62,7 +62,7 @@ The above sample output shows the supervisor starting, downloading the necessary
 
 InSpec will write a JSON file in the `${svc_var_path}/inspec_results` directory containing the results of the last InSpec run. For example, for the `adamleff/inspec-profile-frontend1` package, the InSpec results will be at:
 
-```text
+```
 /hab/svc/inspec-profile-frontend1/var/inspec_results/inspec-profile-frontend1.json
 ```
 
@@ -72,17 +72,45 @@ InSpec will write a JSON file in the `${svc_var_path}/inspec_results` directory 
 
 Create a Habitat package for an InSpec profile. InSpec will validate the profile, fetch and vendor any dependencies (if necessary), and build the Habitat package with a dependency on the latest InSpec. The resulting package will be saved to the current working directory.
 
-The package can then be manually uploaded to a Habitat Depot or manually distributed to a host and installed via `hab pkg install`.
-
 The package file will be named:
 
-```text
+```
 HABITAT_ORIGIN-inspec-profile-PROFILE_NAME-PROFILE_VERSION-BUILD_ID-x86_64-linux.hart
 ```
 
 For example:
 
-```text
+```
+adamleff-inspec-profile-frontend1-0.1.0-20170328173005-x86_64-linux.hart
+```
+
+#### Syntax
+
+```bash
+inspec habitat profile create PROFILE_DIRECTORY
+```
+
+Example:
+
+```bash
+inspec habitat profile create ~/profiles/frontend1
+```
+
+### inspec habitat profile create
+
+Create a Habitat package for an InSpec profile. InSpec will validate the profile, fetch and vendor any dependencies (if necessary), and build the Habitat package with a dependency on the latest InSpec. The resulting package will be saved to the current working directory.
+
+The package can then be manually uploaded to a Habitat Depot or manually distributed to a host and installed via `hab pkg install`.
+
+The package file will be named:
+
+```
+HABITAT_ORIGIN-inspec-profile-PROFILE_NAME-PROFILE_VERSION-BUILD_ID-x86_64-linux.hart
+```
+
+For example:
+
+```
 adamleff-inspec-profile-frontend1-0.1.0-20170328173005-x86_64-linux.hart
 ```
 
@@ -100,7 +128,7 @@ inspec habitat profile create ~/profiles/frontend1
 
 #### Example Output
 
-```text
+```
 $ habitat profile create ~/profiles/frontend1
 [2017-03-28T13:29:32-04:00] INFO: Creating a Habitat artifact for profile: /Users/aleff/profiles/frontend1
 [2017-03-28T13:29:32-04:00] INFO: Checking to see if Habitat is installed...
@@ -123,38 +151,6 @@ $ habitat profile create ~/profiles/frontend1
 [2017-03-28T13:30:18-04:00] INFO: Copying artifact to /Users/aleff...
 ```
 
-### inspec habitat profile setup
-
-Create a Habitat directory that includes a plan file, config hooks, and more in a profile directory.
-
-This is the same process that is used by `inspec habitat profile create` - but this adds the generated Habitat
- directory and file to your system so that you can commit them to source control. If you commit these files to GitHub, you can connect that plan to the [Habitat Builder Service](https://www.habitat.sh/docs/using-builder/).
-
-#### Syntax
-
-```bash
-inspec habitat profile setup PROFILE_DIRECTORY
-```
-
-#### Example
-
-```bash
-inspec habitat profile setup ~/profiles/frontend1
-```
-
-#### Example Output
-
-```bash
-[2018-10-31T23:45:59+00:00] INFO: Setting up profile at /home/nell/profiles/frontend1/ for Habitat...
-[2018-10-31T23:45:59+00:00] INFO: Checking to see if the profile is valid...
-[2018-10-31T23:45:59+00:00] INFO: Profile is valid.
-[2018-10-31T23:45:59+00:00] INFO: Profile's dependencies are already vendored, skipping vendor process.
-[2018-10-31T23:45:59+00:00] INFO: Generating Habitat plan at /home/nell/profiles/frontend1/habitat/plan.sh...
-[2018-10-31T23:45:59+00:00] INFO: Generating a Habitat run hook at /home/nell/profiles/frontend1/habitat/hooks/run...
-[2018-10-31T23:45:59+00:00] INFO: Generating a settings file at /home/nell/profiles/frontend1/habitat/config/settings.sh...
-[2018-10-31T23:45:59+00:00] INFO: Generating Habitat's default.toml configuration...
-```
-
 ### inspec habitat profile upload
 
 Create and then upload a Habitat package for an InSpec profile. Like the `inspec habitat profile create` command, InSpec will validate the profile, fetch and vendor any dependencies (if necessary), and build the Habitat package with a dependency on the latest InSpec. However, instead of saving the package locally to the workstation, InSpec will upload it to the depot defined in the `HAB_DEPOT` environment variable. If `HAB_DEPOT` is not defined, the package will be uploaded to the public Habitat depot at [https://app.habitat.sh](https://app.habitat.sh).
@@ -172,8 +168,7 @@ inspec habitat profile upload ~/profiles/frontend1
 ```
 
 #### Example Output
-
-```text
+```
 [2017-03-28T13:29:32-04:00] INFO: Creating a Habitat artifact for profile: /Users/aleff/profiles/frontend1
 [2017-03-28T13:29:32-04:00] INFO: Checking to see if Habitat is installed...
 [2017-03-28T13:29:32-04:00] INFO: Copying profile contents to the work directory...

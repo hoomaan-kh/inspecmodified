@@ -1,17 +1,18 @@
 # encoding: utf-8
+# author: Christoph Hartmann
+# author: Dominik Richter
+# author: Joe Nuspl
 
 module Inspec::Resources
   class GemPackage < Inspec.resource(1)
     name 'gem'
-    supports platform: 'unix'
-    supports platform: 'windows'
     desc 'Use the gem InSpec audit resource to test if a global gem package is installed.'
-    example <<~EXAMPLE
+    example "
       describe gem('rubocop') do
         it { should be_installed }
         its('version') { should eq '0.33.0' }
       end
-    EXAMPLE
+    "
 
     attr_reader :gem_binary
 
@@ -49,10 +50,9 @@ module Inspec::Resources
       }
       return @info unless @info[:installed]
 
-      versions = params[2].split(',').map(&:strip)
+      versions = params[2].split(',')
       @info[:name] = params[1]
       @info[:version] = versions[0]
-      @info[:versions] = versions
       @info
     end
 
@@ -62,11 +62,6 @@ module Inspec::Resources
 
     def version
       info[:version]
-    end
-
-    # this returns an array of strings
-    def versions
-      info[:versions]
     end
 
     def to_s

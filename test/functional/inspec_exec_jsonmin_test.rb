@@ -11,7 +11,7 @@ describe 'inspec exec' do
   it 'can execute a profile with the mini json formatter and validate its schema' do
     out = inspec('exec ' + example_profile + ' --reporter json-min --no-create-lockfile')
     out.stderr.must_equal ''
-    out.exit_status.must_equal 101
+    out.exit_status.must_equal 0
     data = JSON.parse(out.stdout)
     sout = inspec('schema exec-jsonmin')
     schema = JSON.parse(sout.stdout)
@@ -67,7 +67,7 @@ describe 'inspec exec' do
 
     it 'has a skip_message' do
       ex1['skip_message'].must_be :nil?
-      ex3['skip_message'].must_equal "Can't find file `/tmp/gordon/config.yaml`"
+      ex3['skip_message'].must_equal "Can't find file \"/tmp/gordon/config.yaml\""
     end
   end
 

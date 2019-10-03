@@ -1,20 +1,19 @@
 # encoding: utf-8
 # copyright: 2015, Vulcano Security GmbH
-
-require 'shellwords'
+# author: Dominik Richter
+# author: Christoph Hartmann
+# author: Aaron Lippold
 
 module Inspec::Resources
   class MysqlSession < Inspec.resource(1)
     name 'mysql_session'
-    supports platform: 'unix'
-    supports platform: 'windows'
     desc 'Use the mysql_session InSpec audit resource to test SQL commands run against a MySQL database.'
-    example <<~EXAMPLE
+    example "
       sql = mysql_session('my_user','password','host')
       describe sql.query('show databases like \'test\';') do
         its('stdout') { should_not match(/test/) }
       end
-    EXAMPLE
+    "
 
     def initialize(user = nil, pass = nil, host = 'localhost', port = nil, socket = nil)
       @user = user
@@ -27,10 +26,23 @@ module Inspec::Resources
     end
 
     def query(q, db = '')
-      mysql_cmd = create_mysql_cmd(q, db)
-      cmd = inspec.command(mysql_cmd)
+      # TODO: simple escape, must be handled by a library
+      # that does this securely
+      escaped_query = q.gsub(/\\/, '\\\\').gsub(/"/, '\\"').gsub(/\$/, '\\$')
+
+      # run the query
+      command = "mysql -u#{@user} -p#{@pass}"
+      if !@socket.nil?
+        command += " -S #{@socket}"
+      else
+        command += " -h #{@host}"
+      end
+      command += " --port #{@port}" unless @port.nil?
+      command += " #{db} -s -e \"#{escaped_query}\""
+
+      cmd = inspec.command(command)
       out = cmd.stdout + "\n" + cmd.stderr
-      if out =~ /Can't connect to .* MySQL server/ || out.downcase =~ /^error /
+      if out =~ /Can't connect to .* MySQL server/ || out.downcase =~ /^error/
         # skip this test if the server can't run the query
         warn("Can't connect to MySQL instance for SQL checks.")
       end
@@ -45,34 +57,8 @@ module Inspec::Resources
 
     private
 
-    def escape_string(query)
-      Shellwords.escape(query)
-    end
-
-    def create_mysql_cmd(q, db = '')
-      # TODO: simple escape, must be handled by a library
-      # that does this securely
-      escaped_query = q.gsub(/\\/, '\\\\').gsub(/"/, '\\"').gsub(/\$/, '\\$')
-
-      # construct the query
-      command = 'mysql'
-      command += " -u#{escape_string(@user)}" unless @user.nil?
-      command += " -p#{escape_string(@pass)}" unless @pass.nil?
-
-      if !@socket.nil?
-        command += " -S #{@socket}"
-      else
-        command += " -h #{@host}"
-      end
-      command += " --port #{@port}" unless @port.nil?
-      command += " #{db}" unless db.empty?
-      command += %{ -s -e "#{escaped_query}"}
-      command
-    end
-
     def init_fallback
       # support debian mysql administration login
-      return if inspec.platform.in_family?('windows')
       debian = inspec.command('test -f /etc/mysql/debian.cnf && cat /etc/mysql/debian.cnf').stdout
       return if debian.empty?
 

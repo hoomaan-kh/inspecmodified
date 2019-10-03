@@ -1,15 +1,15 @@
 # encoding: utf-8
+# author: Christoph Hartmann
 
 module Inspec::Resources
   class KernelParameter < Inspec.resource(1)
     name 'kernel_parameter'
-    supports platform: 'unix'
     desc 'Use the kernel_parameter InSpec audit resource to test kernel parameters on Linux platforms.'
-    example <<~EXAMPLE
+    example "
       describe kernel_parameter('net.ipv4.conf.all.forwarding') do
         its('value') { should eq 0 }
       end
-    EXAMPLE
+    "
 
     def initialize(parameter = nil)
       @parameter = parameter
@@ -33,17 +33,22 @@ module Inspec::Resources
     end
   end
 
+  # for compatability with serverspec
+  # this is deprecated syntax and will be removed in future versions
   class LinuxKernelParameter < KernelParameter
     name 'linux_kernel_parameter'
 
     def initialize(parameter)
-      Inspec.deprecate(:resource_linux_kernel_parameter, 'The `linux_kernel_parameter` resource is deprecated. Please use `kernel_parameter`')
       super(parameter)
     end
 
     def value
-      Inspec.deprecate(:resource_linux_kernel_parameter, 'The `linux_kernel_parameter` resource is deprecated. Please use `kernel_parameter`')
+      deprecated
       super()
+    end
+
+    def deprecated
+      warn '[DEPRECATION] `linux_kernel_parameter(parameter)` is deprecated.  Please use `kernel_parameter(parameter)` instead.'
     end
 
     def to_s

@@ -1,5 +1,7 @@
 # encoding: utf-8
 # Copyright 2015 Dominik Richter
+# author: Dominik Richter
+# author: Christoph Hartmann
 
 require 'logger'
 require 'rubygems/version'
@@ -52,9 +54,15 @@ module Inspec
     end
 
     def inspec_requirement
-      # using Gem::Requirement here to allow nil values which
-      # translate to [">= 0"]
-      Gem::Requirement.create(params[:inspec_version])
+      inspec_in_supports = params[:supports].find { |x| !x[:inspec].nil? }
+      if inspec_in_supports
+        warn '[DEPRECATED] The use of inspec.yml `supports:inspec` is deprecated and will be removed in InSpec 2.0. Please use `inspec_version` instead.'
+        Gem::Requirement.create(inspec_in_supports[:inspec])
+      else
+        # using Gem::Requirement here to allow nil values which
+        # translate to [">= 0"]
+        Gem::Requirement.create(params[:inspec_version])
+      end
     end
 
     def supports_runtime?
@@ -76,9 +84,10 @@ module Inspec
         errors.push("Missing profile #{field} in #{ref}")
       end
 
-      if %r{[\/\\]} =~ params[:name]
-        errors.push("The profile name (#{params[:name]}) contains a slash" \
-                      ' which is not permitted. Please remove all slashes from `inspec.yml`.')
+      if params[:name] =~ %r{[\/\\]}
+        warnings.push("Your profile name (#{params[:name]}) contains a slash " \
+          'which will not be permitted in InSpec 2.0. Please change your profile ' \
+          'name in the `inspec.yml` file.')
       end
 
       # if version is set, ensure it is correct
@@ -91,9 +100,9 @@ module Inspec
         warnings.push("Missing profile #{field} in #{ref}")
       end
 
-      # if license is set, ensure it is in SPDX format or marked as proprietary
-      if !params[:license].nil? && !valid_license?(params[:license])
-        warnings.push("License '#{params[:license]}' needs to be in SPDX format or marked as 'Proprietary'. See https://spdx.org/licenses/.")
+      # if version is set, ensure it is in SPDX format
+      if !params[:license].nil? && !Spdx.valid_license?(params[:license])
+        warnings.push("License '#{params[:license]}' needs to be in SPDX format. See https://spdx.org/licenses/.")
       end
 
       [errors, warnings]
@@ -110,10 +119,6 @@ module Inspec
       true
     rescue Semverse::InvalidVersionFormat
       false
-    end
-
-    def valid_license?(value)
-      value =~ /^Proprietary[,;]?\b/ || Spdx.valid_license?(value)
     end
 
     def method_missing(sth, *args)
@@ -149,9 +154,11 @@ module Inspec
         nil
       when nil then nil
       else
-        Inspec.deprecate(:supports_syntax,
-                         "Do not use deprecated `supports: #{x}` syntax. Instead use:\n"\
-                         "supports:\n  - os-family: #{x}\n\n")
+        logger ||= Logger.new(nil)
+        logger.warn(
+          "Do not use deprecated `supports: #{x}` syntax. Instead use:\n"\
+          "supports:\n  - os-family: #{x}\n\n",
+        )
         { :'os-family' => x } # rubocop:disable Style/HashSyntax
       end
     end
@@ -161,6 +168,13 @@ module Inspec
       when Hash   then [finalize_supports_elem(x, logger)]
       when Array  then x.map { |e| finalize_supports_elem(e, logger) }.compact
       when nil    then []
+      else
+        logger ||= Logger.new(nil)
+        logger.warn(
+          "Do not use deprecated `supports: #{x}` syntax. Instead use:\n"\
+          "supports:\n  - os-family: #{x}\n\n",
+        )
+        [{ :'os-family' => x }] # rubocop:disable Style/HashSyntax
       end
     end
 
@@ -182,7 +196,7 @@ module Inspec
       # unit tests that look for warning sequences
       return if original_target.to_s.empty?
       metadata.params[:title] = "tests from #{original_target}"
-      metadata.params[:name] = metadata.params[:title].gsub(%r{[\/\\]}, '.')
+      metadata.params[:name] = metadata.params[:title].gsub(%r{[\\\/]}, '.')
     end
 
     def self.finalize(metadata, profile_id, options, logger = nil)
@@ -199,8 +213,7 @@ module Inspec
 
     def self.from_yaml(ref, content, profile_id, logger = nil)
       res = Metadata.new(ref, logger)
-      require 'erb'
-      res.params = YAML.load(ERB.new(content).result)
+      res.params = YAML.load(content)
       res.content = content
       finalize(res, profile_id, {}, logger)
     end

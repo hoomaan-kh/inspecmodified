@@ -16,7 +16,6 @@ gem 'middleman', '>= 4.0.0'
 gem 'middleman-autoprefixer'
 gem 'middleman-compass', '>= 4.0.0'
 gem 'middleman-livereload'
-gem 'middleman-search_engine_sitemap', '~> 1.4'
 gem 'middleman-sprockets', '>= 4.0.0'
 gem 'middleman-syntax'
 gem 'redcarpet'
@@ -24,9 +23,6 @@ gem 'redcarpet'
 # Tutorial Gems
 gem 'docker-api'
 gem 'github-markup'
-
-# Needed to fetch contrib resource packs, etc.
-gem 'git', '~> 1.4'
 
 # Build process requirements
 gem 'inquirer'

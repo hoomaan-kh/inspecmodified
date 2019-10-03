@@ -7,6 +7,9 @@ module Inspec::Reporters
       # Most currently available Windows terminals have poor support
       # for ANSI extended colors
       COLORS = {
+        'critical' => "\033[0;1;31m",
+        'major'    => "\033[0;1;31m",
+        'minor'    => "\033[0;36m",
         'failed'   => "\033[0;1;31m",
         'passed'   => "\033[0;1;32m",
         'skipped'  => "\033[0;37m",
@@ -16,6 +19,9 @@ module Inspec::Reporters
       # Most currently available Windows terminals have poor support
       # for UTF-8 characters so use these boring indicators
       INDICATORS = {
+        'critical' => '[CRIT]',
+        'major'    => '[MAJR]',
+        'minor'    => '[MINR]',
         'failed'   => '[FAIL]',
         'skipped'  => '[SKIP]',
         'passed'   => '[PASS]',
@@ -24,6 +30,9 @@ module Inspec::Reporters
     else
       # Extended colors for everyone else
       COLORS = {
+        'critical' => "\033[38;5;9m",
+        'major'    => "\033[38;5;208m",
+        'minor'    => "\033[0;36m",
         'failed'   => "\033[38;5;9m",
         'passed'   => "\033[38;5;41m",
         'skipped'  => "\033[38;5;247m",
@@ -33,6 +42,9 @@ module Inspec::Reporters
       # Groovy UTF-8 characters for everyone else...
       # ...even though they probably only work on Mac
       INDICATORS = {
+        'critical' => '×',
+        'major'    => '∅',
+        'minor'    => '⊚',
         'failed'   => '×',
         'skipped'  => '↺',
         'passed'   => '✔',
@@ -44,11 +56,6 @@ module Inspec::Reporters
 
     def render
       run_data[:profiles].each do |profile|
-        if profile[:status] == 'skipped'
-          platform = run_data[:platform]
-          output("Skipping profile: '#{profile[:name]}' on unsupported platform: '#{platform[:name]}/#{platform[:release]}'.")
-          next
-        end
         @control_count = 0
         output('')
         print_profile_header(profile)
@@ -68,17 +75,9 @@ module Inspec::Reporters
     private
 
     def print_profile_header(profile)
-      header = {
-        'Profile' => format_profile_name(profile),
-        'Version' => profile[:version] || '(not specified)',
-      }
-      header['Target'] = run_data[:platform][:target] unless run_data[:platform][:target].nil?
-      header['Target ID'] = @config['target_id'] unless @config['target_id'].nil?
-
-      pad = header.keys.max_by(&:length).length + 1
-      header.each do |title, value|
-        output(format("%-#{pad}s %s", title + ':', value))
-      end
+      output("Profile: #{format_profile_name(profile)}")
+      output("Version: #{profile[:version] || '(not specified)'}")
+      output("Target:  #{run_data[:platform][:target]}") unless run_data[:platform][:target].nil?
       output('')
     end
 
@@ -154,7 +153,7 @@ module Inspec::Reporters
 
       message_to_format = ''
       message_to_format += "#{INDICATORS[indicator]}  " unless indicator.nil?
-      message_to_format += message.to_s.lstrip.force_encoding(Encoding::UTF_8)
+      message_to_format += message.to_s.lstrip
 
       format_with_color(color, indent_lines(message_to_format, indentation))
     end
@@ -178,15 +177,27 @@ module Inspec::Reporters
     end
 
     def profile_summary
+      return @profile_summary unless @profile_summary.nil?
+
       failed = 0
       skipped = 0
       passed = 0
+      critical = 0
+      major = 0
+      minor = 0
 
       all_unique_controls.each do |control|
         next if control[:id].start_with? '(generated from '
         next unless control[:results]
         if control[:results].any? { |r| r[:status] == 'failed' }
           failed += 1
+          if control[:impact] >= 0.7
+            critical += 1
+          elsif control[:impact] >= 0.4
+            major += 1
+          else
+            minor += 1
+          end
         elsif control[:results].any? { |r| r[:status] == 'skipped' }
           skipped += 1
         else
@@ -196,15 +207,22 @@ module Inspec::Reporters
 
       total = failed + passed + skipped
 
-      {
+      @profile_summary = {
         'total' => total,
-        'failed' => failed,
+        'failed' => {
+          'total' => failed,
+          'critical' => critical,
+          'major' => major,
+          'minor' => minor,
+        },
         'skipped' => skipped,
         'passed' => passed,
       }
     end
 
     def tests_summary
+      return @tests_summary unless @tests_summary.nil?
+
       total = 0
       failed = 0
       skipped = 0
@@ -223,12 +241,7 @@ module Inspec::Reporters
         end
       end
 
-      {
-        'total' => total,
-        'failed' => failed,
-        'skipped' => skipped,
-        'passed' => passed,
-      }
+      @tests_summary = { 'total' => total, 'failed' => failed, 'skipped' => skipped, 'passed' => passed }
     end
 
     def print_profile_summary
@@ -236,11 +249,11 @@ module Inspec::Reporters
       return unless summary['total'] > 0
 
       success_str = summary['passed'] == 1 ? '1 successful control' : "#{summary['passed']} successful controls"
-      failed_str  = summary['failed'] == 1 ? '1 control failure' : "#{summary['failed']} control failures"
+      failed_str  = summary['failed']['total'] == 1 ? '1 control failure' : "#{summary['failed']['total']} control failures"
       skipped_str = summary['skipped'] == 1 ? '1 control skipped' : "#{summary['skipped']} controls skipped"
 
       success_color = summary['passed'] > 0 ? 'passed' : 'no_color'
-      failed_color = summary['failed'] > 0 ? 'failed' : 'no_color'
+      failed_color = summary['failed']['total'] > 0 ? 'failed' : 'no_color'
       skipped_color = summary['skipped'] > 0 ? 'skipped' : 'no_color'
 
       s = format(
@@ -288,6 +301,11 @@ module Inspec::Reporters
     end
 
     class Control
+      IMPACT_SCORES = {
+        critical: 0.7,
+        major: 0.4,
+      }.freeze
+
       attr_reader :data
 
       def initialize(control_hash)
@@ -340,8 +358,12 @@ module Inspec::Reporters
           'skipped'
         elsif results.nil? || results.empty? || results.all? { |r| r[:status] == 'passed' }
           'passed'
+        elsif impact >= IMPACT_SCORES[:critical]
+          'critical'
+        elsif impact >= IMPACT_SCORES[:major]
+          'major'
         else
-          'failed'
+          'minor'
         end
       end
 
@@ -352,8 +374,12 @@ module Inspec::Reporters
           'passed'
         elsif impact.nil?
           'unknown'
+        elsif impact >= IMPACT_SCORES[:critical]
+          'critical'
+        elsif impact >= IMPACT_SCORES[:major]
+          'major'
         else
-          'failed'
+          'minor'
         end
       end
 

@@ -2,10 +2,8 @@ require 'helper'
 require 'inspec/dependencies/requirement'
 
 describe Inspec::Requirement do
-  let(:config) { { cwd: nil, backend: nil } }
-  let(:req) { Inspec::Requirement.new('foo', constraints, config, {}) }
-
   describe '#source_satisfies_spec?' do
+    let(:req) { Inspec::Requirement.new('foo', constraints, nil, nil, {}) }
 
     describe 'when there are no version constraints' do
       let(:constraints) { nil }
@@ -72,23 +70,6 @@ describe Inspec::Requirement do
         req.stubs(:profile).returns(profile)
         req.source_satisfies_spec?.must_equal true
       end
-    end
-  end
-
-  describe '#to_hash' do
-    let(:constraints) { nil }
-    it 'returns the correct Hash' do
-      resolved_source = { compliance: 'spam', url: 'eggs', sha256: 'bacon' }
-      req.stubs(:resolved_source).returns(resolved_source)
-      req.stubs(:dependencies).returns({})
-
-      correct_hash = {
-        'name' => 'foo',
-        'resolved_source' => resolved_source,
-        'version_constraints' => [],
-      }
-
-      req.to_hash.must_equal correct_hash
     end
   end
 end

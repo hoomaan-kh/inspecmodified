@@ -2,6 +2,9 @@
 #
 # Copyright 2017, Christoph Hartmann
 #
+# author: Christoph Hartmann
+# author: Patrick Muench
+# author: Dominik Richter
 
 require 'utils/filter'
 require 'hashie/mash'
@@ -10,23 +13,25 @@ module Inspec::Resources
   class DockerContainerFilter
     # use filtertable for containers
     filter = FilterTable.create
-    filter.register_custom_matcher(:exists?) { |x| !x.entries.empty? }
-    filter.register_column(:commands,       field: 'command')
-          .register_column(:ids,            field: 'id')
-          .register_column(:images,         field: 'image')
-          .register_column(:labels,         field: 'labels', style: :simple)
-          .register_column(:local_volumes,  field: 'localvolumes')
-          .register_column(:mounts,         field: 'mounts')
-          .register_column(:names,          field: 'names')
-          .register_column(:networks,       field: 'networks')
-          .register_column(:ports,          field: 'ports')
-          .register_column(:running_for,    field: 'runningfor')
-          .register_column(:sizes,          field: 'size')
-          .register_column(:status,         field: 'status')
-          .register_custom_matcher(:running?) { |x|
+    filter.add_accessor(:where)
+          .add_accessor(:entries)
+          .add(:commands,       field: 'command')
+          .add(:ids,            field: 'id')
+          .add(:images,         field: 'image')
+          .add(:labels,         field: 'labels')
+          .add(:local_volumes,  field: 'localvolumes')
+          .add(:mounts,         field: 'mounts')
+          .add(:names,          field: 'names')
+          .add(:networks,       field: 'networks')
+          .add(:ports,          field: 'ports')
+          .add(:running_for,    field: 'runningfor')
+          .add(:sizes,          field: 'size')
+          .add(:status,         field: 'status')
+          .add(:exists?) { |x| !x.entries.empty? }
+          .add(:running?) { |x|
             x.where { status.downcase.start_with?('up') }
           }
-    filter.install_filter_methods_on_resource(self, :containers)
+    filter.connect(self, :containers)
 
     attr_reader :containers
     def initialize(containers)
@@ -36,15 +41,17 @@ module Inspec::Resources
 
   class DockerImageFilter
     filter = FilterTable.create
-    filter.register_custom_matcher(:exists?) { |x| !x.entries.empty? }
-    filter.register_column(:ids,           field: 'id')
-          .register_column(:repositories,  field: 'repository')
-          .register_column(:tags,          field: 'tag')
-          .register_column(:sizes,         field: 'size')
-          .register_column(:digests,       field: 'digest')
-          .register_column(:created,       field: 'createdat')
-          .register_column(:created_since, field: 'createdsize')
-    filter.install_filter_methods_on_resource(self, :images)
+    filter.add_accessor(:where)
+          .add_accessor(:entries)
+          .add(:ids,              field: 'id')
+          .add(:repositories,     field: 'repository')
+          .add(:tags,             field: 'tag')
+          .add(:sizes,            field: 'size')
+          .add(:digests,          field: 'digest')
+          .add(:created,          field: 'createdat')
+          .add(:created_since,    field: 'createdsize')
+          .add(:exists?) { |x| !x.entries.empty? }
+    filter.connect(self, :images)
 
     attr_reader :images
     def initialize(images)
@@ -52,30 +59,18 @@ module Inspec::Resources
     end
   end
 
-  class DockerPluginFilter
-    filter = FilterTable.create
-    filter.add(:ids,      field: 'id')
-          .add(:names,    field: 'name')
-          .add(:versions, field: 'version')
-          .add(:enabled,  field: 'enabled')
-    filter.connect(self, :plugins)
-
-    attr_reader :plugins
-    def initialize(plugins)
-      @plugins = plugins
-    end
-  end
-
   class DockerServiceFilter
     filter = FilterTable.create
-    filter.register_custom_matcher(:exists?) { |x| !x.entries.empty? }
-    filter.register_column(:ids,      field: 'id')
-          .register_column(:names,    field: 'name')
-          .register_column(:modes,    field: 'mode')
-          .register_column(:replicas, field: 'replicas')
-          .register_column(:images,   field: 'image')
-          .register_column(:ports,    field: 'ports')
-    filter.install_filter_methods_on_resource(self, :services)
+    filter.add_accessor(:where)
+          .add_accessor(:entries)
+          .add(:ids,              field: 'id')
+          .add(:names,            field: 'name')
+          .add(:modes,            field: 'mode')
+          .add(:replicas,         field: 'replicas')
+          .add(:images,           field: 'image')
+          .add(:ports,            field: 'ports')
+          .add(:exists?) { |x| !x.entries.empty? }
+    filter.connect(self, :services)
 
     attr_reader :services
     def initialize(services)
@@ -89,22 +84,18 @@ module Inspec::Resources
   # - docker_image
   class Docker < Inspec.resource(1)
     name 'docker'
-    supports platform: 'unix'
+
     desc "
       A resource to retrieve information about docker
     "
 
-    example <<~EXAMPLE
+    example "
       describe docker.containers do
         its('images') { should_not include 'u12:latest' }
       end
 
       describe docker.images do
         its('repositories') { should_not include 'inssecure_image' }
-      end
-
-      describe docker.plugins.where { name == 'rexray/ebs' } do
-        it { should exist }
       end
 
       describe docker.services do
@@ -127,7 +118,7 @@ module Inspec::Resources
           its(%w(HostConfig Privileged)) { should_not cmp true }
         end
       end
-    EXAMPLE
+    "
 
     def containers
       DockerContainerFilter.new(parse_containers)
@@ -135,10 +126,6 @@ module Inspec::Resources
 
     def images
       DockerImageFilter.new(parse_images)
-    end
-
-    def plugins
-      DockerPluginFilter.new(parse_plugins)
     end
 
     def services
@@ -190,28 +177,21 @@ module Inspec::Resources
       # since docker is not outputting valid json, we need to parse each row
       raw.each_line { |entry|
         # convert all keys to lower_case to work well with ruby and filter table
-        row = JSON.parse(entry).map { |key, value|
-          [key.downcase, value]
+        j = JSON.parse(entry).map { |k, v|
+          [k.downcase, v]
         }.to_h
 
         # ensure all keys are there
-        row = ensure_keys(row, labels)
+        j = ensure_keys(j, labels)
 
         # strip off any linked container names
         # Depending on how it was linked, the actual container name may come before
         # or after the link information, so we'll just look for the first name that
         # does not include a slash since that is not a valid character in a container name
-        if row['names']
-          row['names'] = row['names'].split(',').find { |c| !c.include?('/') }
-        end
+        j['names'] = j['names'].split(',').find { |c| !c.include?('/') } if j.key?('names')
 
-        # Split labels on ',' or set to empty array
-        # Allows for `docker.containers.where { labels.include?('app=redis') }`
-        row['labels'] = row.key?('labels') ? row['labels'].split(',') : []
-
-        output.push(row)
+        output.push(j)
       }
-
       output
     rescue JSON::ParserError => _e
       warn "Could not parse `docker #{subcommand}` output"
@@ -253,18 +233,6 @@ module Inspec::Resources
       c_images
     rescue JSON::ParserError => _e
       warn 'Could not parse `docker images` output'
-      []
-    end
-
-    def parse_plugins
-      plugins = inspec.command('docker plugin ls --format \'{"id": {{json .ID}}, "name": "{{ with split .Name ":"}}{{index . 0}}{{end}}", "version": "{{ with split .Name ":"}}{{index . 1}}{{end}}", "enabled": {{json .Enabled}} }\'').stdout
-      c_plugins = []
-      plugins.each_line { |entry|
-        c_plugins.push(JSON.parse(entry))
-      }
-      c_plugins
-    rescue JSON::ParserError => _e
-      warn 'Could not parse `docker plugin ls` output'
       []
     end
   end

@@ -1,5 +1,7 @@
 # encoding: utf-8
 # copyright: 2015, Vulcano Security GmbH
+# author: Dominik Richter
+# author: Christoph Hartmann
 
 require 'shellwords'
 
@@ -19,10 +21,8 @@ module Inspec::Resources
     include LinuxMountParser
 
     name 'file'
-    supports platform: 'unix'
-    supports platform: 'windows'
     desc 'Use the file InSpec audit resource to test all system file types, including files, directories, symbolic links, named pipes, sockets, character devices, block devices, and doors.'
-    example <<~EXAMPLE
+    example "
       describe file('path') do
         it { should exist }
         it { should be_file }
@@ -32,7 +32,7 @@ module Inspec::Resources
         it { should be_owned_by 'root' }
         its('mode') { should cmp '0644' }
       end
-    EXAMPLE
+    "
 
     attr_reader :file, :mount_options
     def initialize(path)
@@ -44,7 +44,7 @@ module Inspec::Resources
     %w{
       type exist? file? block_device? character_device? socket? directory?
       symlink? pipe? mode mode? owner owned_by? group grouped_into?
-      link_path shallow_link_path linked_to? mtime size selinux_label immutable?
+      link_path linked_to? mtime size selinux_label immutable?
       product_version file_version version? md5sum sha256sum
       path basename source source_path uid gid
     }.each do |m|
@@ -98,7 +98,7 @@ module Inspec::Resources
       return file.mounted? if expected_options.nil?
 
       # deprecation warning, this functionality will be removed in future version
-      Inspec.deprecate(:file_resource_be_mounted_matchers, 'The file resource `be_mounted.with` and `be_mounted.only_with` matchers are deprecated. Please use the `mount` resource instead')
+      warn "[DEPRECATION] `be_mounted.with and be_mounted.only_with` are deprecated.  Please use `mount('#{source_path}')` instead."
 
       # we cannot read mount data on non-Linux systems
       return nil if !inspec.os.linux?

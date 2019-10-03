@@ -20,17 +20,6 @@ describe Fetchers::Url do
       m
     }
 
-    def expect_url_transform
-      @mock_logger = Minitest::Mock.new
-      @mock_logger.expect(:warn, nil, [/URL target.*transformed/])
-
-      Inspec::Log.stub :warn, proc { |message| @mock_logger.warn(message) } do
-        yield
-      end
-
-      @mock_logger.verify
-    end
-
     it 'handles a http url' do
       url = 'http://chef.io/some.tar.gz'
       res = Fetchers::Url.resolve(url)
@@ -45,14 +34,7 @@ describe Fetchers::Url do
       res.expects(:open).returns(mock_open)
       _(res).must_be_kind_of Fetchers::Url
       _(res.resolved_source).must_equal({url: 'https://chef.io/some.tar.gz', sha256: expected_shasum})
-    end
 
-    it 'handles an https URI' do
-      uri = URI.parse('https://chef.io/some.tar.gz')
-      res = Fetchers::Url.resolve(uri)
-      res.expects(:open).returns(mock_open)
-      _(res).must_be_kind_of Fetchers::Url
-      _(res.resolved_source).must_equal({url: 'https://chef.io/some.tar.gz', sha256: expected_shasum})
     end
 
     it 'doesnt handle other schemas' do
@@ -70,34 +52,28 @@ describe Fetchers::Url do
        http://github.com/chef/inspec.git
        http://www.github.com/chef/inspec.git}.each do |github|
       it "resolves a github url #{github}" do
-        expect_url_transform do
-          res = Fetchers::Url.resolve(github)
-          res.expects(:open).returns(mock_open)
-          _(res).wont_be_nil
-          _(res.resolved_source).must_equal({url: 'https://github.com/chef/inspec/archive/master.tar.gz', sha256: expected_shasum})
-        end
+        res = Fetchers::Url.resolve(github)
+        res.expects(:open).returns(mock_open)
+        _(res).wont_be_nil
+        _(res.resolved_source).must_equal({url: 'https://github.com/chef/inspec/archive/master.tar.gz', sha256: expected_shasum})
       end
     end
 
     it "resolves a github branch url" do
-      expect_url_transform do
-        github = 'https://github.com/hardening-io/tests-os-hardening/tree/2.0'
-        res = Fetchers::Url.resolve(github)
-        res.expects(:open).returns(mock_open)
-        _(res).wont_be_nil
-        _(res.resolved_source).must_equal({url: 'https://github.com/hardening-io/tests-os-hardening/archive/2.0.tar.gz', sha256: expected_shasum})
-      end
+      github = 'https://github.com/hardening-io/tests-os-hardening/tree/2.0'
+      res = Fetchers::Url.resolve(github)
+      res.expects(:open).returns(mock_open)
+      _(res).wont_be_nil
+      _(res.resolved_source).must_equal({url: 'https://github.com/hardening-io/tests-os-hardening/archive/2.0.tar.gz', sha256: expected_shasum})
     end
 
     it "resolves a github commit url" do
-      expect_url_transform do
-        github = 'https://github.com/hardening-io/tests-os-hardening/tree/48bd4388ddffde68badd83aefa654e7af3231876'
-        res = Fetchers::Url.resolve(github)
-        res.expects(:open).returns(mock_open)
-        _(res).wont_be_nil
-        _(res.resolved_source).must_equal({url: 'https://github.com/hardening-io/tests-os-hardening/archive/48bd4388ddffde68badd83aefa654e7af3231876.tar.gz',
-                                           sha256: expected_shasum})
-      end
+      github = 'https://github.com/hardening-io/tests-os-hardening/tree/48bd4388ddffde68badd83aefa654e7af3231876'
+      res = Fetchers::Url.resolve(github)
+      res.expects(:open).returns(mock_open)
+      _(res).wont_be_nil
+      _(res.resolved_source).must_equal({url: 'https://github.com/hardening-io/tests-os-hardening/archive/48bd4388ddffde68badd83aefa654e7af3231876.tar.gz',
+                                         sha256: expected_shasum})
     end
 
     %w{https://bitbucket.org/chef/inspec
@@ -107,84 +83,29 @@ describe Fetchers::Url do
        http://bitbucket.org/chef/inspec.git
        http://www.bitbucket.org/chef/inspec.git}.each do |bitbucket|
       it "resolves a bitbucket url #{bitbucket}" do
-        expect_url_transform do
-          res = Fetchers::Url.resolve(bitbucket)
-          res.expects(:open).returns(mock_open)
-          _(res).wont_be_nil
-          _(res.resolved_source).must_equal({url: 'https://bitbucket.org/chef/inspec/get/master.tar.gz', sha256: expected_shasum})
-        end
+        res = Fetchers::Url.resolve(bitbucket)
+        res.expects(:open).returns(mock_open)
+        _(res).wont_be_nil
+        _(res.resolved_source).must_equal({url: 'https://bitbucket.org/chef/inspec/get/master.tar.gz', sha256: expected_shasum})
       end
     end
 
     it "resolves a bitbucket branch url" do
-      expect_url_transform do
-        bitbucket = 'https://bitbucket.org/chef/inspec/branch/newbranch'
-        res = Fetchers::Url.resolve(bitbucket)
-        res.expects(:open).returns(mock_open)
-        _(res).wont_be_nil
-        _(res.resolved_source).must_equal({url: 'https://bitbucket.org/chef/inspec/get/newbranch.tar.gz', sha256: expected_shasum})
-      end
+      bitbucket = 'https://bitbucket.org/chef/inspec/branch/newbranch'
+      res = Fetchers::Url.resolve(bitbucket)
+      res.expects(:open).returns(mock_open)
+      _(res).wont_be_nil
+      _(res.resolved_source).must_equal({url: 'https://bitbucket.org/chef/inspec/get/newbranch.tar.gz', sha256: expected_shasum})
     end
 
     it "resolves a bitbucket commit url" do
-      expect_url_transform do
-        bitbucket = 'https://bitbucket.org/chef/inspec/commits/48bd4388ddffde68badd83aefa654e7af3231876'
-        res = Fetchers::Url.resolve(bitbucket)
-        res.expects(:open).returns(mock_open)
-        _(res).wont_be_nil
-        _(res.resolved_source).must_equal({url: 'https://bitbucket.org/chef/inspec/get/48bd4388ddffde68badd83aefa654e7af3231876.tar.gz', sha256: expected_shasum})
-      end
+      bitbucket = 'https://bitbucket.org/chef/inspec/commits/48bd4388ddffde68badd83aefa654e7af3231876'
+      res = Fetchers::Url.resolve(bitbucket)
+      res.expects(:open).returns(mock_open)
+      _(res).wont_be_nil
+      _(res.resolved_source).must_equal({url: 'https://bitbucket.org/chef/inspec/get/48bd4388ddffde68badd83aefa654e7af3231876.tar.gz', sha256: expected_shasum})
     end
 
-  end
-
-  describe 'download_automate2_archive_to_temp' do
-    let(:target) { 'https://myurl/file.tar.gz' }
-    let(:options) do
-      {
-        'automate' => {
-          'ent' => 'automate',
-          'token_type' => 'dctoken',
-        },
-        'token' => '1234abcd',
-        'server_type' => 'automate2',
-        'profile' => ['admin', 'ssh-baseline', '2.0']
-      }
-    end
-    let(:subject) { Fetchers::Url.resolve(target, options) }
-
-    it "downloads tar to tmp file" do
-      mock = Object.new
-      mock.stubs(:body).returns('this is the body')
-      Net::HTTP.expects(:start)
-               .returns(mock)
-
-      path = subject.send(:download_automate2_archive_to_temp)
-      File.read(path).must_equal 'this is the body'
-    end
-
-    it "sets default http options" do
-      mock = Object.new
-      mock.stubs(:body).returns('this is the body')
-      opts = {"chef-delivery-enterprise"=>"automate", "x-data-collector-token"=>"1234abcd", :use_ssl=>true, :verify_mode=>1}
-      Net::HTTP.expects(:start)
-               .with('myurl', 443, opts)
-               .returns(mock)
-
-      subject.send(:download_automate2_archive_to_temp)
-    end
-
-    it "sets insecure http options" do
-      options['insecure'] = true
-      mock = Object.new
-      mock.stubs(:body).returns('this is the body')
-      opts = {:ssl_verify_mode => 0, "chef-delivery-enterprise"=>"automate", "x-data-collector-token"=>"1234abcd", :use_ssl=>true, :verify_mode=>0}
-      Net::HTTP.expects(:start)
-               .with('myurl', 443, opts)
-               .returns(mock)
-
-      subject.send(:download_automate2_archive_to_temp)
-    end
   end
 
   describe 'applied to a valid url (mocked tar.gz)' do
@@ -216,20 +137,6 @@ describe Fetchers::Url do
 
   describe '#http_opts' do
     let(:subject) { Fetchers::Url.new('fake_url', config) }
-
-    describe 'when username and password is specified' do
-      let(:config) { { :username => 'dummy', :password => 'dummy' } }
-      it 'returns a hash containing http_basic_authentication setting' do
-        subject.send(:http_opts)[:http_basic_authentication].must_equal ["dummy", "dummy"]
-      end
-    end
-
-    describe 'when only password is specified' do
-      let(:config) { { :password => 'dummy'} }
-      it 'returns a hash containing http_basic_authentication setting as nil' do
-        subject.send(:http_opts)[:http_basic_authentication].must_be_nil
-      end
-    end
 
     describe 'when insecure is specified' do
       let(:config) { { 'insecure' => true } }

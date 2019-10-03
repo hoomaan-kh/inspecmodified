@@ -1,4 +1,6 @@
 # encoding: utf-8
+# author: Christoph Hartmann
+# author: Dominik Richter
 
 require 'utils/filter'
 
@@ -25,10 +27,8 @@ module Inspec::Resources
     include GroupManagementSelector
 
     name 'groups'
-    supports platform: 'unix'
-    supports platform: 'windows'
     desc 'Use the group InSpec audit resource to test groups on the system. Groups can be filtered.'
-    example <<~EXAMPLE
+    example "
       describe groups.where { name == 'root'} do
         its('names') { should eq ['root'] }
         its('gids') { should eq [0] }
@@ -38,7 +38,7 @@ module Inspec::Resources
         its('names') { should eq ['Administrators'] }
         its('gids') { should eq ['S-1-5-32-544'] }
       end
-    EXAMPLE
+    "
 
     def initialize
       # select group manager
@@ -47,12 +47,13 @@ module Inspec::Resources
     end
 
     filter = FilterTable.create
-    filter.register_custom_matcher(:exists?) { |x| !x.entries.empty? }
-    filter.register_column(:names,     field: 'name')
-          .register_column(:gids,      field: 'gid')
-          .register_column(:domains,   field: 'domain')
-          .register_column(:members,   field: 'members', style: :simple)
-    filter.install_filter_methods_on_resource(self, :collect_group_details)
+    filter.add_accessor(:where)
+          .add_accessor(:entries)
+          .add(:names,     field: 'name')
+          .add(:gids,      field: 'gid')
+          .add(:domains,   field: 'domain')
+          .add(:exists?) { |x| !x.entries.empty? }
+    filter.connect(self, :collect_group_details)
 
     def to_s
       'Groups'
@@ -73,23 +74,21 @@ module Inspec::Resources
   #   its('gid') { should eq 0 }
   # end
   #
+  # deprecated has matcher
+  # describe group('root') do
+  #  it { should have_gid 0 }
+  # end
   class Group < Inspec.resource(1)
     include GroupManagementSelector
 
     name 'group'
-    supports platform: 'unix'
-    supports platform: 'windows'
     desc 'Use the group InSpec audit resource to test groups on the system.'
-    example <<~EXAMPLE
+    example "
       describe group('root') do
         it { should exist }
         its('gid') { should eq 0 }
       end
-
-      describe group('Administrators') do
-        its('members') { should include 'Administrator' }
-      end
-    EXAMPLE
+    "
 
     def initialize(groupname)
       @group = groupname
@@ -105,11 +104,20 @@ module Inspec::Resources
     end
 
     def gid
-      flatten_entry(group_info, 'gid')
+      gids = group_info.gids
+      if gids.empty?
+        nil
+      # the default case should be one group
+      elsif gids.size == 1
+        gids.entries[0]
+      else
+        raise 'found more than one group with the same name, please use `groups` resource'
+      end
     end
 
-    def members
-      flatten_entry(group_info, 'members')
+    # implements rspec has matcher, to be compatible with serverspec
+    def has_gid?(compare_gid)
+      gid == compare_gid
     end
 
     def local
@@ -122,17 +130,6 @@ module Inspec::Resources
     end
 
     private
-
-    def flatten_entry(group_info, prop)
-      entries = group_info.entries
-      if entries.empty?
-        nil
-      elsif entries.size == 1
-        entries.first.send(prop)
-      else
-        raise 'found more than one group with the same name, please use `groups` resource'
-      end
-    end
 
     def group_info
       # we need a local copy for the block
@@ -184,22 +181,18 @@ module Inspec::Resources
   class WindowsGroup < GroupInfo
     # returns all local groups
     def groups
-      script = <<-EOH
-        Function ConvertTo-SID { Param([byte[]]$BinarySID)
-          (New-Object System.Security.Principal.SecurityIdentifier($BinarySID,0)).Value
+      script = <<~EOH
+        Function  ConvertTo-SID { Param([byte[]]$BinarySID)
+          (New-Object  System.Security.Principal.SecurityIdentifier($BinarySID,0)).Value
         }
-        $Computername = $Env:Computername
-        $adsi = [ADSI]"WinNT://$Computername"
-        $groups = $adsi.Children | where {$_.SchemaClassName -eq 'group'} | ForEach {
+
+        $Computername =  $Env:Computername
+        $adsi  = [ADSI]"WinNT://$Computername"
+        $groups = $adsi.Children | where {$_.SchemaClassName -eq  'group'} |  ForEach {
           $name = $_.Name[0]
           $sid = ConvertTo-SID -BinarySID $_.ObjectSID[0]
           $group =[ADSI]$_.Path
-          $members = $_.Members() | Foreach-Object { $_.GetType().InvokeMember('Name', 'GetProperty', $null, $_, $null) }
-          # An empty collection of these objects isn't properly converted to an empty array by ConvertTo-Json
-          if(-not [bool]$members) {
-            $members = @()
-          }
-          new-object psobject -property @{name = $group.Name[0]; gid = $sid; domain = $Computername; members = $members}
+          new-object psobject -property @{name = $group.Name[0]; gid = $sid; domain=$Computername}
         }
         $groups | ConvertTo-Json -Depth 3
       EOH
@@ -213,7 +206,7 @@ module Inspec::Resources
       end
 
       # ensure we have an array of groups
-      groups = [groups] unless groups.is_a?(Array)
+      groups = [groups] if !groups.is_a?(Array)
       groups
     end
   end

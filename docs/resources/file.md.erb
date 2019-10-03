@@ -1,6 +1,5 @@
 ---
 title: About the file Resource
-platform: os
 ---
 
 # file
@@ -8,16 +7,6 @@ platform: os
 Use the `file` InSpec audit resource to test all system file types, including files, directories, symbolic links, named pipes, sockets, character devices, block devices, and doors.
 
 <br>
-
-## Availability
-
-### Installation
-
-This resource is distributed along with InSpec itself. You can use it automatically.
-
-### Version
-
-This resource first became available in v1.0.0 of InSpec.
 
 ## Syntax
 
@@ -35,21 +24,19 @@ where
 
 <br>
 
-## Properties
+## Supported Resource Properties
 
-### General Properties
+### General Resource Properties
 
-content, size, basename, path, owner, group, type
+content, size, basename, path, owner, group, type 
 
-### Unix/Linux Properties
+### Unix/Linux Resource Properties 
 
-symlink, mode, link\_path, shallow\_link\_path, mtime, size, selinux\_label, md5sum, sha256sum, path, source, source\_path, uid, gid
+symlink, mode, link_path, mtime, size, selinux\_label, md5sum, sha256sum, path, source, source\_path, uid, gid
 
-### Windows Properties
+### Windows Resource Properties
 
 file\_version, product\_version
-
-<br>
 
 ## Resource Property Examples
 
@@ -61,10 +48,10 @@ The `content` property tests if contents in the file match the value specified i
 
 The following complete example tests the `pg_hba.conf` file in PostgreSQL for MD5 requirements.  The tests look at all `host` and `local` settings in that file, and then compare the MD5 checksums against the values in the test:
 
-    describe file('/etc/postgresql/9.1/main/pg_hba.conf') do
+    describe file(hba_config_file) do
       its('content') { should match(%r{local\s.*?all\s.*?all\s.*?md5}) }
       its('content') { should match(%r{host\s.*?all\s.*?all\s.*?127.0.0.1\/32\s.*?md5}) }
-      its('content') { should match(%r{host\s.*?all\s.*?all\s.*?::1\/128\s.*?md5}) }
+      its('content') { should match(%r{host\s.*?all\s.*?all\s.*?::1\/128\s.*?md5})
     end
 
 ### file_version
@@ -84,16 +71,9 @@ The following examples show how to use this InSpec audit resource.
 ### link_path
 
 The `link_path` property tests if the file exists at the specified path. If the file is a symlink,
-InSpec will resolve the symlink recursively and return the ultimate linked file.
+InSpec will resolve the symlink and return the ultimate linked file.
 
     its('link_path') { should eq '/some/path/to/file' }
-
-### shallow\_link\_path
-
-The `shallow_link_path`` property returns the path that the file refers to, only resolving
-it once (that is, it performs a readlink operation). If the file is not a symlink, nil is returned.
-
-    its('shallow_link_path') { should eq '/some/path/to/file' }
 
 ### md5sum
 
@@ -106,18 +86,6 @@ The `md5sum` property tests if the MD5 checksum for a file matches the specified
 The `mode` property tests if the mode assigned to the file matches the specified value.
 
     its('mode') { should cmp '0644' }
-
-InSpec [octal](https://en.wikipedia.org/wiki/Leading_zero#0_as_a_prefix) values begin the numeric mode specification with zero.
-
-For example, write:
-
-    { should cmp '0644' }
-
-not
-
-    { should cmp '644' }
-
-Without the zero prefix for the octal value, InSpec will interpret it as the _decimal_ value 644, which is octal 1024 or `-----w-r-T`, and any test for a file that is `-rw-r--r--` will fail.
 
 ### mtime
 
@@ -138,7 +106,7 @@ The `owner` property tests if the owner of the file matches the specified value.
 
 The `product_version` property tests if a Windows file's product version matches the specified value. The difference between a file's "file version" and "product version" is that the file version is the version number of the file itself, whereas the product version is the version number associated with the application from which that file originates.
 
-    its('product_version') { should eq '2.3.4' }
+    its('product_version') { should eq 2.3.4 }
 
 ### selinux_label
 
@@ -194,7 +162,7 @@ or:
 
 ### Test the contents of a file for MD5 requirements
 
-    describe file('/etc/postgresql/9.1/main/pg_hba.conf') do
+    describe file(hba_config_file) do
       its('content') { should match /local\s.*?all\s.*?all\s.*?md5/ }
       its('content') { should match %r{/host\s.*?all\s.*?all\s.*?127.0.0.1\/32\s.*?md5/} }
       its('content') { should match %r{/host\s.*?all\s.*?all\s.*?::1\/128\s.*?md5/} }
@@ -203,20 +171,20 @@ or:
 ### Test if a file exists
 
     describe file('/tmp') do
-      it { should exist }
+     it { should exist }
     end
 
 ### Test that a file does not exist
 
     describe file('/tmpest') do
-      it { should_not exist }
+     it { should_not exist }
     end
 
 ### Test if a path is a directory
 
     describe file('/tmp') do
-      its('type') { should eq :directory }
-      it { should be_directory }
+     its('type') { should eq :directory }
+     it { should be_directory }
     end
 
 ### Test if a path is a file and not a directory
@@ -320,7 +288,7 @@ or:
 The following example shows how to use the `file` audit resource to verify if the `ntp.conf` and `leap-seconds` files are present, and then the `command` resource to verify if NTP is installed and running:
 
     describe file('/etc/ntp.conf') do
-      it { should be_file }
+       it { should be_file }
     end
 
     describe file('/etc/ntp.leapseconds') do
@@ -328,12 +296,12 @@ The following example shows how to use the `file` audit resource to verify if th
     end
 
     describe command('pgrep ntp') do
-      its('exit_status') { should eq 0 }
+       its('exit_status') { should eq 0 }
     end
 
 ### Test parameters of symlinked file
 
-If you need to test the parameters of the target file for a symlink, you can use the `link_path` (recursive resolution) or `shallow_link_path` (direct link) method for the `file` resource.
+If you need to test the parameters of the target file for a symlink, you can use the `link_path` method for the `file` resource.
 
 For example, for the following symlink:
 
@@ -357,7 +325,7 @@ For example, for the following symlink:
 
 ## Matchers
 
-For a full list of available matchers, please visit our [matchers page](https://www.inspec.io/docs/reference/matchers/).
+For a full list of available matchers please visit our [matchers page](https://www.inspec.io/docs/reference/matchers/). 
 
 ### be\_allowed
 
@@ -541,3 +509,4 @@ The `exist` matcher tests if the named file exists:
 The `have_mode` matcher tests if a file has a mode assigned to it:
 
     it { should have_mode }
+

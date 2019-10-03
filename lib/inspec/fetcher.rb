@@ -2,7 +2,8 @@
 # author: Dominik Richter
 # author: Christoph Hartmann
 
-require 'inspec/plugin/v1'
+require 'inspec/plugins'
+require 'utils/plugin_registry'
 
 module Inspec
   class FetcherRegistry < PluginRegistry
@@ -42,6 +43,3 @@ end
 require 'fetchers/local'
 require 'fetchers/url'
 require 'fetchers/git'
-
-# TODO: Remove in 4.0 when Compliance fetcher plugin is created
-require 'plugins/inspec-compliance/lib/inspec-compliance/api'

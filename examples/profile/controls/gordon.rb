@@ -11,13 +11,13 @@ title 'Gordon Config Checks'
 # EOF
 # ```
 control 'gordon-1.0' do
-  impact 'critical'
+  impact 0.7
   title 'Verify the version number of Gordon'
   desc 'An optional description...'
   tag 'gordon'
   ref 'Gordon Requirements 1.0', uri: 'http://...'
 
-  # Test using the custom gordon_config InSpec resource
+  # Test using the custom gordon_config Inspec resource
   # Find the resource content here: ../libraries/
   describe gordon_config do
     it { should exist }

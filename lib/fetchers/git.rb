@@ -29,11 +29,7 @@ module Fetchers
     priority 200
 
     def self.resolve(target, opts = {})
-      if target.is_a?(String)
-        new(target, opts) if target.start_with?('git@') || target.end_with?('.git')
-      elsif target.respond_to?(:has_key?) && target.key?(:git)
-        new(target[:git], opts.merge(target))
-      end
+      new(target[:git], opts.merge(target)) if target.respond_to?(:has_key?) && target.key?(:git)
     end
 
     def initialize(remote_url, opts = {})
@@ -54,7 +50,7 @@ module Fetchers
         Dir.mktmpdir do |tmpdir|
           checkout(tmpdir)
           Inspec::Log.debug("Checkout of #{resolved_ref} successful. Moving checkout to #{dir}")
-          FileUtils.cp_r(tmpdir + '/.', @repo_directory)
+          FileUtils.cp_r(tmpdir, @repo_directory)
         end
       end
       @repo_directory
@@ -87,9 +83,7 @@ module Fetchers
     end
 
     def resolve_ref(ref_name)
-      command_string = "git ls-remote \"#{@remote_url}\" \"#{ref_name}*\""
-      cmd = shellout(command_string)
-      raise "Error running '#{command_string}': #{cmd.stderr}" unless cmd.exitstatus == 0
+      cmd = shellout("git ls-remote \"#{@remote_url}\" \"#{ref_name}*\"")
       ref = parse_ls_remote(cmd.stdout, ref_name)
       if !ref
         raise "Unable to resolve #{ref_name} to a specific git commit for #{@remote_url}"

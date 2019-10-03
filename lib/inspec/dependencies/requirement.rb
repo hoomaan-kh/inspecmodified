@@ -1,5 +1,6 @@
 # encoding: utf-8
 require 'inspec/cached_fetcher'
+require 'inspec/dependencies/dependency_set'
 require 'semverse'
 
 module Inspec
@@ -16,42 +17,37 @@ module Inspec
       if dep[:path]
         req_path = File.expand_path(dep[:path], req_path)
       end
-      config = {
-        cache: cache,
-        cwd: req_path,
-      }
 
       new(dep[:name],
           dep[:version],
-          config,
+          cache,
+          req_path,
           opts.merge(dep))
     end
 
-    def self.from_lock_entry(entry, config, opts = {})
+    def self.from_lock_entry(entry, cwd, cache, backend, opts = {})
       req = new(entry[:name],
                 entry[:version_constraints],
-                config,
-                entry[:resolved_source].merge(backend: config[:backend]).merge(opts))
+                cache,
+                cwd,
+                entry[:resolved_source].merge(backend: backend).merge(opts))
 
       locked_deps = []
       Array(entry[:dependencies]).each do |dep_entry|
-        dep_config = config.dup
-        dep_config[:parent_profile] = entry[:name]
-        locked_deps << Inspec::Requirement.from_lock_entry(dep_entry, dep_config, opts)
+        locked_deps << Inspec::Requirement.from_lock_entry(dep_entry, cwd, cache, backend, opts)
       end
       req.lock_deps(locked_deps)
       req
     end
 
     attr_reader :cwd, :opts, :version_constraints
-    def initialize(name, version_constraints, config, opts)
+    def initialize(name, version_constraints, cache, cwd, opts)
       @name = name
       @version_constraints = Array(version_constraints)
-      @cache = config[:cache]
+      @cache = cache
       @backend = opts[:backend]
       @opts = opts
-      @cwd = config[:cwd]
-      @parent_profile = config[:parent_profile]
+      @cwd = cwd
     end
 
     #
@@ -84,7 +80,7 @@ module Inspec
       h = {
         'name' => name,
         'resolved_source' => resolved_source,
-        'version_constraints' => version_constraints,
+        'version_constraints' => version_constraints.to_s,
       }
 
       if !dependencies.empty?
@@ -118,13 +114,10 @@ module Inspec
       return @profile unless @profile.nil?
       opts = @opts.dup
       opts[:backend] = @backend
-      if !@dependencies.nil? && !@dependencies.empty?
+      if !@dependencies.nil?
         opts[:dependencies] = Inspec::DependencySet.from_array(@dependencies, @cwd, @cache, @backend)
       end
-      opts[:profile_name] = @name
-      opts[:parent_profile] = @parent_profile
       @profile = Inspec::Profile.for_fetcher(fetcher, opts)
-      @profile
     end
   end
 end

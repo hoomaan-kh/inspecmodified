@@ -1,18 +1,45 @@
 # encoding: utf-8
+# author: Dominik Richter
+# author: Christoph Hartmann
 
 require 'functional/helper'
 
 describe 'command tests' do
   include FunctionalHelper
 
+  describe 'detect with json' do
+    it 'runs well on all nodes' do
+      out = inspec('detect --format json')
+      out.stderr.must_equal ''
+      out.exit_status.must_equal 0
+      j = JSON.load(out.stdout)
+      j.keys.must_include 'name'
+      j.keys.must_include 'family'
+      j.keys.must_include 'arch'
+      j.keys.must_include 'release'
+    end
+  end
+
+  describe 'detect without json' do
+    it 'runs well on all nodes' do
+      out = inspec('detect')
+      out.stderr.must_equal ''
+      out.exit_status.must_equal 0
+      std = out.stdout
+      std.must_include "\n== Operating System Details\n\n"
+      std.must_include "\nName:      \e[0;36m"
+      std.must_include "\nFamily:    \e[0;36m"
+      std.must_include "\nArch:      \e[0;36m"
+      std.must_include "\nRelease:   \e[0;36m"
+    end
+  end
+
   describe 'version' do
     it 'provides the version number on stdout' do
       out = inspec('version')
       out.stderr.must_equal ''
       out.exit_status.must_equal 0
-      # Tolerate working on an out of date branch
-      output = out.stdout.split("\n").reject { |l| l.start_with?('Your version of InSpec is out of date!') }.join("\n") + "\n"
-      output.must_equal Inspec::VERSION + "\n"
+      out.stdout.must_equal Inspec::VERSION+"\n"
     end
 
     it 'prints the version as JSON when the format is specified as JSON' do
@@ -28,46 +55,6 @@ describe 'command tests' do
       out = inspec('check ' + example_profile)
       out.stdout.must_match(/Valid.*true/)
       out.exit_status.must_equal 0
-    end
-  end
-
-  describe 'help' do
-    let(:outputs) {
-      [
-        inspec('help').stdout,
-        inspec('--help').stdout,
-        inspec('').stdout,
-      ]
-    }
-
-    it 'outputs the same message regardless of invocation' do
-      outputs.uniq.length.must_equal 1
-    end
-
-    it 'outputs both core commands and v2 CLI plugins' do
-      commands = %w{
-        archive
-        artifact
-        check
-        compliance
-        detect
-        env
-        exec
-        habitat
-        help
-        init
-        json
-        plugin
-        shell
-        supermarket
-        vendor
-        version
-      }
-      outputs.each do |output|
-        commands.each do |subcommand|
-          output.must_include('inspec ' + subcommand)
-        end
-      end
     end
   end
 end

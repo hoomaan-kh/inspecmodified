@@ -1,13 +1,12 @@
 # encoding: utf-8
+# author: Thomas Cate
 
 require 'utils/simpleconfig'
-require 'utils/file_reader'
 
 class GrubConfig < Inspec.resource(1)
   name 'grub_conf'
-  supports platform: 'unix'
   desc 'Use the grub_conf InSpec audit resource to test the boot config of Linux systems that use Grub.'
-  example <<~EXAMPLE
+  example "
     describe grub_conf('/etc/grub.conf',  'default') do
       its('kernel') { should include '/vmlinuz-2.6.32-573.7.1.el6.x86_64' }
       its('initrd') { should include '/initramfs-2.6.32-573.el6.x86_64.img=1' }
@@ -19,15 +18,12 @@ class GrubConfig < Inspec.resource(1)
     describe grub_conf('/etc/grub.conf',  'CentOS (2.6.32-573.12.1.el6.x86_64)') do
       its('kernel') { should include 'audit=1' }
     end
-  EXAMPLE
-
-  include FileReader
+  "
 
   class UnknownGrubConfig < StandardError; end
 
   def initialize(path = nil, kernel = nil)
     config_for_platform(path)
-    @content = read_file(@conf_path)
     @kernel = kernel || 'default'
   rescue UnknownGrubConfig
     return skip_resource 'The `grub_config` resource is not supported on your OS yet.'
@@ -179,7 +175,21 @@ class GrubConfig < Inspec.resource(1)
   end
 
   def read_file(config_file)
-    read_file_content(config_file)
+    file = inspec.file(config_file)
+
+    if !file.file? && !file.symlink?
+      skip_resource "Can't find file '#{@conf_path}'"
+      return @params = {}
+    end
+
+    content = file.content
+
+    if content.empty? && !file.empty?
+      skip_resource "Can't read file '#{@conf_path}'"
+      return @params = {}
+    end
+
+    content
   end
 
   def read_params

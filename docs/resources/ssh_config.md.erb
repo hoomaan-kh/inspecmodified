@@ -1,6 +1,5 @@
 ---
 title: About the ssh_config Resource
-platform: linux
 ---
 
 # ssh_config
@@ -8,16 +7,6 @@ platform: linux
 Use the `ssh_config` InSpec audit resource to test OpenSSH client configuration data located at `/etc/ssh/ssh_config` on Linux and Unix platforms.
 
 <br>
-
-## Availability
-
-### Installation
-
-This resource is distributed along with InSpec itself. You can use it automatically.
-
-### Version
-
-This resource first became available in v1.0.0 of InSpec.
 
 ## Syntax
 
@@ -57,6 +46,13 @@ The following examples show how to use this InSpec audit resource.
       its('SendEnv') { should include('GORDON_CLIENT') }
     end
 
+### Test owner and group permissions
+
+    describe ssh_config do
+      its('owner') { should eq 'root' }
+      its('mode') { should cmp '0644' }
+    end
+
 ### Test SSH configuration
 
     describe ssh_config do
@@ -70,7 +66,7 @@ The following examples show how to use this InSpec audit resource.
 
 ## Matchers
 
-For a full list of available matchers, please visit our [matchers page](https://www.inspec.io/docs/reference/matchers/).
+For a full list of available matchers please visit our [matchers page](https://www.inspec.io/docs/reference/matchers/). 
 
 ### name
 

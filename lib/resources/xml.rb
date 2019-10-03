@@ -1,17 +1,16 @@
 # encoding: utf-8
+# author: Jonathan Morley
 
 module Inspec::Resources
   class XmlConfig < JsonConfig
     name 'xml'
-    supports platform: 'unix'
-    supports platform: 'windows'
     desc 'Use the xml InSpec resource to test configuration data in an XML file'
-    example <<~EXAMPLE
+    example "
       describe xml('default.xml') do
         its('key/sub_key') { should eq(['value']) }
         its(['root/name.with.a.period']) { should cmp 'so_many_dots' }
       end
-    EXAMPLE
+    "
 
     def parse(content)
       require 'rexml/document'
@@ -27,8 +26,6 @@ module Inspec::Resources
           output.push(element.to_s)
         elsif element.is_a?(REXML::Element)
           output.push(element.text)
-        elsif element.is_a?(Integer) || element.is_a?(TrueClass) || element.is_a?(FalseClass) || element.is_a?(String)
-          output.push(element)
         else
           raise Inspec::Exceptions::ResourceFailed, "Unknown XML object received (#{element.class}): #{element}"
         end

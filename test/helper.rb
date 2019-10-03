@@ -18,8 +18,6 @@ require 'pathname'
 require 'tempfile'
 require 'tmpdir'
 require 'zip'
-require 'json'
-require 'byebug'
 
 require 'inspec/base_cli'
 require 'inspec/version'
@@ -27,19 +25,15 @@ require 'inspec/exceptions'
 require 'inspec/fetcher'
 require 'inspec/source_reader'
 require 'inspec/resource'
-require 'resource_support/aws'
 require 'inspec/reporters'
 require 'inspec/backend'
 require 'inspec/profile'
 require 'inspec/runner'
 require 'inspec/runner_mock'
-require 'inspec/globals'
-require 'inspec/impact'
-require 'inspec/config'
 require 'fetchers/mock'
-require 'inspec/dependencies/cache'
 
-require_relative '../lib/bundles/inspec-supermarket'
+require_relative '../lib/bundles/inspec-compliance'
+require_relative '../lib/bundles/inspec-habitat'
 
 require 'train'
 CMD = Train.create('local', command_runner: :generic).connection
@@ -55,7 +49,6 @@ class MockLoader
     centos5:    { name: 'centos', family: 'redhat', release: '5.11', arch: 'x86_64' },
     centos6:    { name: 'centos', family: 'redhat', release: '6.6', arch: 'x86_64' },
     centos7:    { name: 'centos', family: 'redhat', release: '7.1.1503', arch: 'x86_64' },
-    cloudlinux: { name: 'cloudlinux', family: 'redhat', release: '7.4', arch: 'x86_64' },
     coreos:     { name: 'coreos', family: 'coreos', release: '1437.0.0', arch: 'x86_64' },
     debian6:    { name: 'debian', family: 'debian', release: '6', arch: 'x86_64' },
     debian7:    { name: 'debian', family: 'debian', release: '7', arch: 'x86_64' },
@@ -75,8 +68,6 @@ class MockLoader
     solaris10:  { name: "solaris", family: 'solaris', release: '10', arch: 'i386'},
     hpux:       { name: 'hpux', family: 'hpux', release: 'B.11.31', arch: 'ia64'},
     aix:        { name: 'aix', family: 'aix', release: '7.2', arch: 'powerpc' },
-    amazon:     { name: 'amazon', family: 'redhat', release: '2015.03', arch: 'x86_64' },
-    amazon2:    { name: 'amazon', family: 'redhat', release: '2', arch: 'x86_64' },
     undefined:  { name: nil, family: nil, release: nil, arch: nil },
   }
 
@@ -91,7 +82,7 @@ class MockLoader
     scriptpath = ::File.realpath(::File.dirname(__FILE__))
 
     # create mock backend
-    @backend = Inspec::Backend.create(Inspec::Config.mock)
+    @backend = Inspec::Backend.create({ backend: :mock, verbose: true })
     mock = @backend.backend
 
     # create all mock files
@@ -164,7 +155,6 @@ class MockLoader
       '/etc/nginx/conf/mime.types' => mockfile.call('nginx_mime.types'),
       '/etc/nginx/conf.d/foobar.conf' => mockfile.call('nginx_confd_foobar.conf'),
       '/etc/nginx/conf.d/multiple.conf' => mockfile.call('nginx_confd_multiple.conf'),
-      '/etc/nginx/quotes.d/example.conf' => mockfile.call('nginx_quotesd_example.conf'),
       '/etc/xinetd.conf' => mockfile.call('xinetd.conf'),
       '/etc/xinetd.d' => mockfile.call('xinetd.d'),
       '/etc/xinetd.d/chargen-stream' => mockfile.call('xinetd.d_chargen-stream'),
@@ -200,18 +190,12 @@ class MockLoader
       '/fakepath/fakefile' => emptyfile.call,
       'C:/fakepath/fakefile' => emptyfile.call,
       '/etc/cron.d/crondotd' => mockfile.call('crondotd'),
-      '/missing_file' => emptyfile.call,
     }
 
     # create all mock commands
     cmd = lambda {|x|
       stdout = ::File.read(::File.join(scriptpath, '/unit/mock/cmd/'+x))
       mock.mock_command('', stdout, '', 0)
-    }
-
-    cmd_stderr = lambda { |x = nil|
-      stderr = x.nil? ? '' : File.read(File.join(scriptpath, 'unit/mock/cmd', x))
-      mock.mock_command('', '', stderr, 1)
     }
 
     empty = lambda {
@@ -223,7 +207,7 @@ class MockLoader
       mock.mock_command('', '', stderr, 1)
     }
 
-    mock_cmds = {
+    mock.commands = {
       '' => empty.call,
       'sh -c \'find /no/such/mock -type f -maxdepth 1\'' => empty.call,
       'type "brew"' => empty.call,
@@ -231,9 +215,6 @@ class MockLoader
       'bash -c \'type "/test/path/pip"\'' => empty.call,
       'bash -c \'type "Rscript"\'' => empty.call,
       'bash -c \'type "perl"\'' => empty.call,
-      'bash -c \'type "/sbin/auditctl"\'' => empty.call,
-      'bash -c \'type "sql"\'' => cmd_exit_1.call,
-      'type "pwsh"' => empty.call,
       'type "netstat"' => empty.call,
       'sh -c \'find /etc/apache2/ports.conf -type l -maxdepth 1\'' => empty.call,
       'sh -c \'find /etc/httpd/conf.d/*.conf -type l -maxdepth 1\'' => empty.call,
@@ -244,23 +225,22 @@ class MockLoader
       'ps axo pid,pcpu,pmem,vsz,rss,tty,stat,start,time,user,command' => cmd.call('ps-axo'),
       'ps axo label,pid,pcpu,pmem,vsz,rss,tty,stat,start,time,user:32,command' => cmd.call('ps-axoZ'),
       'ps -o pid,vsz,rss,tty,stat,time,ruser,args' => cmd.call('ps-busybox'),
+      'ps --help' => empty.call,
       'env' => cmd.call('env'),
       '${Env:PATH}'  => cmd.call('$env-PATH'),
       # registry key test using winrm 2.0
-      '9417f24311a9dcd90f1b1734080a2d4c6516ec8ff2d452a2328f68eb0ed676cf' => cmd.call('reg_schedule'),
+      'bd15a11a4b07de0224c4d1ab16c49ad78dd6147650c6ef629152c7093a5ac95e' => cmd.call('reg_schedule'),
       'Auditpol /get /subcategory:\'User Account Management\' /r' => cmd.call('auditpol'),
       '/sbin/auditctl -l' => cmd.call('auditctl'),
       '/sbin/auditctl -s' => cmd.call('auditctl-s'),
       'yum -v repolist all'  => cmd.call('yum-repolist-all'),
       'dpkg -s curl' => cmd.call('dpkg-s-curl'),
       'dpkg -s held-package' => cmd.call('dpkg-s-held-package'),
-      'rpm -qi curl' => cmd.call('rpm-qi-curl'),
-      'rpm -qi --dbpath /var/lib/fake_rpmdb curl' => cmd.call('rpm-qi-curl'),
-      'rpm -qi --dbpath /var/lib/rpmdb_does_not_exist curl' => cmd_exit_1.call,
+      'rpm -qia curl' => cmd.call('rpm-qia-curl'),
+      'rpm -qia --dbpath /var/lib/fake_rpmdb curl' => cmd.call('rpm-qia-curl'),
+      'rpm -qia --dbpath /var/lib/rpmdb_does_not_exist curl' => cmd_exit_1.call,
       'pacman -Qi curl' => cmd.call('pacman-qi-curl'),
       'brew info --json=v1 curl' => cmd.call('brew-info--json-v1-curl'),
-      'brew info --json=v1 nginx' => cmd.call('brew-info--json-v1-nginx'),
-      'brew info --json=v1 nope' => cmd_exit_1.call,
       '/usr/local/bin/brew info --json=v1 curl' => cmd.call('brew-info--json-v1-curl'),
       'gem list --local -a -q ^not-installed$' => cmd.call('gem-list-local-a-q-not-installed'),
       'gem list --local -a -q ^rubocop$' => cmd.call('gem-list-local-a-q-rubocop'),
@@ -268,8 +248,7 @@ class MockLoader
       '/opt/chef/embedded/bin/gem list --local -a -q ^chef-sugar$' => cmd.call('gem-list-local-a-q-chef-sugar'),
       'c:\opscode\chef\embedded\bin\gem.bat list --local -a -q ^json$' => cmd.call('gem-list-local-a-q-json'),
       '/opt/opscode/embedded/bin/gem list --local -a -q ^knife-backup$' => cmd.call('gem-list-local-a-q-knife-backup'),
-      'npm -g ls --json bower' => cmd.call('npm-g-ls--json-bower'),
-      'cd /path/to/project && npm ls --json bower' => cmd.call('npm-ls--json-bower'),
+      'npm ls -g --json bower' => cmd.call('npm-ls-g--json-bower'),
       "Rscript -e 'packageVersion(\"DBI\")'" => cmd.call('r-print-version'),
       "Rscript -e 'packageVersion(\"DoesNotExist\")'" => cmd.call('r-print-version-not-installed'),
       "perl -le 'eval \"require $ARGV[0]\" and print $ARGV[0]->VERSION or exit 1' DBD::Pg" => cmd.call('perl-print-version'),
@@ -279,15 +258,8 @@ class MockLoader
       '/test/path/pip show django' => cmd.call('pip-show-non-standard-django'),
       "Get-Package -Name 'Mozilla Firefox' | ConvertTo-Json" => cmd.call('get-package-firefox'),
       "Get-Package -Name 'Ruby 2.1.6-p336-x64' | ConvertTo-Json" => cmd.call('get-package-ruby'),
-      'Get-Command "choco"' => empty.call,
-      'bash -c \'type "choco"\'' => cmd_exit_1.call,
-      '(choco list --local-only --exact --include-programs --limit-output \'nssm\') -Replace "\|", "=" | ConvertFrom-StringData | ConvertTo-JSON' => cmd.call('choco-list-nssm'),
-      '(choco list --local-only --exact --include-programs --limit-output \'git\') -Replace "\|", "=" | ConvertFrom-StringData | ConvertTo-JSON' => empty.call,
       "New-Object -Type PSObject | Add-Member -MemberType NoteProperty -Name Service -Value (Get-Service -Name 'dhcp'| Select-Object -Property Name, DisplayName, Status) -PassThru | Add-Member -MemberType NoteProperty -Name WMI -Value (Get-WmiObject -Class Win32_Service | Where-Object {$_.Name -eq 'dhcp' -or $_.DisplayName -eq 'dhcp'} | Select-Object -Property StartMode) -PassThru | ConvertTo-Json" => cmd.call('get-service-dhcp'),
-      "New-Object -Type PSObject | Add-Member -MemberType NoteProperty -Name Pip -Value (Invoke-Command -ScriptBlock {where.exe pip}) -PassThru | Add-Member -MemberType NoteProperty -Name Python -Value (Invoke-Command -ScriptBlock {where.exe python}) -PassThru | ConvertTo-Json" => cmd.call('get-windows-pip-package'),
-      "Get-WindowsFeature | Where-Object {$_.Name -eq 'DHCP' -or $_.DisplayName -eq 'DHCP'} | Select-Object -Property Name,DisplayName,Description,Installed,InstallState | ConvertTo-Json" => cmd.call('get-windows-feature'),
-      "Get-WindowsFeature | Where-Object {$_.Name -eq 'IIS-WebServer' -or $_.DisplayName -eq 'IIS-WebServer'} | Select-Object -Property Name,DisplayName,Description,Installed,InstallState | ConvertTo-Json" => cmd_exit_1.call('get-windows-feature-iis-webserver'),
-      "dism /online /get-featureinfo /featurename:IIS-WebServer" => cmd.call('dism-iis-webserver'),
+      "Get-WindowsFeature | Where-Object {$_.Name -eq 'dhcp' -or $_.DisplayName -eq 'dhcp'} | Select-Object -Property Name,DisplayName,Description,Installed,InstallState | ConvertTo-Json" => cmd.call('get-windows-feature'),
       'lsmod' => cmd.call('lsmod'),
       '/sbin/sysctl -q -n net.ipv4.conf.all.forwarding' => cmd.call('sbin_sysctl'),
       # ports on windows
@@ -295,6 +267,10 @@ class MockLoader
       'netstat -anbo | Select-String  -CaseSensitive -pattern "^\s+UDP|\s+LISTENING\s+\d+$" -context 0,1' => cmd.call('netstat-anbo-pipe-select-string-pattern.utf8'),
       # lsof formatted list of ports (should be quite cross platform)
       'lsof -nP -i -FpctPn' => cmd.call('lsof-nP-i-FpctPn'),
+      # ports on linux
+      %{bash -c 'type "ss"'} => empty.call(), # allow the ss command to exist so the later mock is called
+      'netstat -tulpen' => cmd.call('netstat-tulpen'),
+      'ss -tulpen' => cmd.call('ss-tulpen'),
       # ports on freebsd
       'sockstat -46l' => cmd.call('sockstat'),
       # ports on aix
@@ -302,17 +278,17 @@ class MockLoader
       'rmsock f0000000000000001 tcpcb' => cmd.call('rmsock-f0001'),
       'rmsock f0000000000000002 tcpcb' => cmd.call('rmsock-f0002'),
       # packages on windows
-      'f7718ece69188bb19cd458e2aeab0a8d968f3d40ac2f4199e21cc976f8db5ef6' => cmd.call('get-item-property-package'),
+      '6785190b3df7291a7622b0b75b0217a9a78bd04690bc978df51ae17ec852a282' => cmd.call('get-item-property-package'),
       # service status upstart on ubuntu
       'initctl status ssh' => cmd.call('initctl-status-ssh'),
       # upstart version on ubuntu
       'initctl --version' => cmd.call('initctl--version'),
       # show ssh service Centos 7
-      'systemctl show --no-pager --all sshd' => cmd.call('systemctl-show-all-sshd'),
-      'systemctl show --no-pager --all apache2' => cmd.call('systemctl-show-all-apache2'),
-      '/path/to/systemctl show --no-pager --all sshd' => cmd.call('systemctl-show-all-sshd'),
-      'systemctl show --no-pager --all dbus' => cmd.call('systemctl-show-all-dbus'),
-      '/path/to/systemctl show --no-pager --all dbus' => cmd.call('systemctl-show-all-dbus'),
+      'systemctl show --all sshd' => cmd.call('systemctl-show-all-sshd'),
+      'systemctl show --all apache2' => cmd.call('systemctl-show-all-apache2'),
+      '/path/to/systemctl show --all sshd' => cmd.call('systemctl-show-all-sshd'),
+      'systemctl show --all dbus' => cmd.call('systemctl-show-all-dbus'),
+      '/path/to/systemctl show --all dbus' => cmd.call('systemctl-show-all-dbus'),
       # services on macos
       'launchctl list' => cmd.call('launchctl-list'),
       # services on freebsd 10
@@ -338,7 +314,7 @@ class MockLoader
       # user info for windows (winrm 1.6.0, 1.6.1)
       '27c6cda89fa5d196506251c0ed0d20468b378c5689711981dc1e1e683c7b02c1' => cmd.call('adsiusers'),
       # group info for windows
-      '4020573097e910a573e22e8863c4faa434f52910a45714606cad1fb8b060d9e9' => cmd.call('adsigroups'),
+      'd8d5b3e3355650399e23857a526ee100b4e49e5c2404a0a5dbb7d85d7f4de5cc' => cmd.call('adsigroups'),
       # group info for Darwin
       'dscacheutil -q group' => cmd.call('dscacheutil-query-group'),
       # network interface
@@ -361,8 +337,7 @@ class MockLoader
       # apt
       "find /etc/apt/ -name *.list -exec sh -c 'cat {} || echo -n' \\;" => cmd.call('etc-apt'),
       # iptables
-      '/usr/sbin/iptables  -S' => cmd.call('iptables-s'),
-      %{bash -c 'type "/usr/sbin/iptables"'} => empty.call,
+      'iptables  -S' => cmd.call('iptables-s'),
       # apache_conf
       "sh -c 'find /etc/apache2/ports.conf -type f -maxdepth 1'" => cmd.call('find-apache2-ports-conf'),
       "sh -c 'find /etc/httpd/conf.d/*.conf -type f -maxdepth 1'" => cmd.call('find-httpd-ssl-conf'),
@@ -374,7 +349,6 @@ class MockLoader
       "sh -c 'find /etc/nginx/conf/mime.types'" => cmd.call('find-nginx-mime-types'),
       "sh -c 'find /etc/nginx/proxy.conf'" => cmd.call('find-nginx-proxy-conf'),
       "sh -c 'find /etc/nginx/conf.d/*.conf'" => cmd.call('find-nginx-confd-multiple-conf'),
-      "sh -c 'find /etc/nginx/quotes.d/*.conf'" => cmd.call('find-nginx-quotesd-example-conf'),
       # mount
       "mount | grep -- ' on /'" => cmd.call("mount"),
       "mount | grep -- ' on /mnt/iso-disk'" => cmd.call("mount-multiple"),
@@ -426,7 +400,7 @@ class MockLoader
       '/sbin/zpool get -Hp all tank' => cmd.call('zpool-get-all-tank'),
       # docker
       "4f8e24022ea8b7d3b117041ec32e55d9bf08f11f4065c700e7c1dc606c84fd17" => cmd.call('docker-ps-a'),
-      "b40ed61c006b54f155b28a85dc944dc0352b30222087b47c6279568ec0e59d05" => cmd.call('df-t'),
+      "9ef45813d4545f35d6fe9d6456c0b1063f9f5a80c699d3bb19da0699ab2d6ecc" => cmd.call('df'),
       "docker version --format '{{ json . }}'"  => cmd.call('docker-version'),
       "docker info --format '{{ json . }}'" => cmd.call('docker-info'),
       "docker inspect 71b5df59442b" => cmd.call('docker-inspec'),
@@ -434,28 +408,17 @@ class MockLoader
       "83c36bfade9375ae1feb91023cd1f7409b786fd992ad4013bf0f2259d33d6406" => cmd.call('docker-images'),
       # docker services
       %{docker service ls --format '{"ID": {{json .ID}}, "Name": {{json .Name}}, "Mode": {{json .Mode}}, "Replicas": {{json .Replicas}}, "Image": {{json .Image}}, "Ports": {{json .Ports}}}'} => cmd.call('docker-service-ls'),
-      # docker plugins
-      %{docker plugin ls --format '{"id": {{json .ID}}, "name": "{{ with split .Name ":"}}{{index . 0}}{{end}}", "version": "{{ with split .Name ":"}}{{index . 1}}{{end}}", "enabled": {{json .Enabled}} }'} => cmd.call('docker-plugin-ls'),
       # modprobe for kernel_module
       "modprobe --showconfig" => cmd.call('modprobe-config'),
       # get-process cmdlet for processes resource
       '$Proc = Get-Process -IncludeUserName | Where-Object {$_.Path -ne $null } | Select-Object PriorityClass,Id,CPU,PM,VirtualMemorySize,NPM,SessionId,Responding,StartTime,TotalProcessorTime,UserName,Path | ConvertTo-Csv -NoTypeInformation;$Proc.Replace("""","").Replace("`r`n","`n")' => cmd.call('get-process_processes'),
-      # host resource: TCP/UDP reachability check on linux
-      %{bash -c 'type "nc"'} => empty.call,
-      %{bash -c 'type "ncat"'} => empty.call,
-      %{bash -c 'type "timeout"'} => empty.call,
-      %{strings `which bash` | grep -qE '/dev/(tcp|udp)/'} => empty.call,
-      %{echo | nc -v -w 1 -u example.com 1234} => empty.call,
-      %{echo | nc -v -w 1  example.com 1234} => empty.call,
-      'timeout 1 bash -c "< /dev/tcp/example.com/1234"' => empty.call,
-      'timeout 1 bash -c "< /dev/udp/example.com/1234"' => empty.call,
+      # host resource: check to see if netcat is installed
+      %{bash -c 'type "nc"'} => cmd.call('type-nc'),
+      'type "nc"' => cmd.call('type-nc'),
+      # host resource: netcat for TCP reachability check on linux
+      'echo | nc -v -w 1 example.com 1234' => cmd.call('nc-example-com'),
       # host resource: netcat for TCP reachability check on darwin
-      'type "nc"' => empty.call,
-      'type "ncat"' => empty.call,
-      'type "gtimeout"' => empty.call,
-      'nc -vz -G 1 example.com 1234' => empty.call,
-      'gtimeout 1 bash -c "< /dev/tcp/example.com/1234"' => empty.call,
-      'gtimeout 1 bash -c "< /dev/udp/example.com/1234"' => empty.call,
+      'nc -vz -G 1 example.com 1234' => cmd.call('nc-example-com'),
       # host resource: test-netconnection for reachability check on windows
       'Test-NetConnection -ComputerName microsoft.com -WarningAction SilentlyContinue -RemotePort 1234| Select-Object -Property ComputerName, TcpTestSucceeded, PingSucceeded | ConvertTo-Json' => cmd.call('Test-NetConnection'),
       # postgres tests
@@ -464,17 +427,13 @@ class MockLoader
       # mssql tests
       "bash -c 'type \"sqlcmd\"'" => cmd.call('mssql-sqlcmd'),
       "cb0efcd12206e9690c21ac631a72be9dd87678aa048e6dae16b8e9353ab6dd64" => cmd.call('mssql-getdate'),
-      "7109e5d809058cd3e9cad108e21e91234d2638db4a4f81fadfde21e071a423dc" => cmd.call('mssql-getdate'),
-      "5c2bc0f0568d11451d6cf83aff02ee3d47211265b52b6c5d45f8e57290b35082" => cmd.call('mssql-getdate'),
-      "148af1d7706d9cf81097f66d5b891ddfca719445d60fa582befad118f51b9d92" => cmd.call('mssql-getdate'),
-      "9a1dfd9e403053efb1fd1970a77a241e5c7a9eae34e6f6c56904fa8189bc2e45" => cmd.call('mssql-getdate'),
       "e8bece33e9d550af1fc81a5bc1c72b647b3810db3e567ee9f30feb81f4e3b700" => cmd.call('mssql-getdate'),
       "53d201ff1cfb8867b79200177b8e2e99dedb700c5fbe15e43820011d7e8b941f" => cmd.call('mssql-getdate'),
-      "4b550bb227058ac5851aa0bc946be794ee46489610f17842700136cf8bb5a0e9" => cmd.call('mssql-getdate'),
       "7d1a7a0f2bd1e7da9a6904e1f28981146ec01a0323623e12a8579d30a3960a79" => cmd.call('mssql-result'),
+      "5c2bc0f0568d11451d6cf83aff02ee3d47211265b52b6c5d45f8e57290b35082" => cmd.call('mssql-getdate'),
       # oracle
       "bash -c 'type \"sqlplus\"'" => cmd.call('oracle-cmd'),
-      "1998da5bc0f09bd5258fad51f45447556572b747f631661831d6fcb49269a448" => cmd.call('oracle-result'),
+      "527f243fe9b01fc7b7d78eb1ef5200e272b011aa07c9f59836d950107d6d2a5c" => cmd.call('oracle-result'),
       # nginx mock cmd
       %{nginx -V 2>&1} => cmd.call('nginx-v'),
       %{/usr/sbin/nginx -V 2>&1} => cmd.call('nginx-v'),
@@ -512,28 +471,21 @@ class MockLoader
       '/sbin/service sshd status' => empty.call,
       'service apache2 status' => cmd_exit_1.call,
       'type "lsof"' => empty.call,
-      'test -f /etc/mysql/debian.cnf && cat /etc/mysql/debian.cnf' => empty.call,
+
       # http resource - remote worker'
       %{bash -c 'type "curl"'} => cmd.call('bash-c-type-curl'),
       "curl -i -X GET --connect-timeout 60 --max-time 120 'http://www.example.com'" => cmd.call('http-remote-no-options'),
-      "curl -i -X GET --connect-timeout 60 --max-time 120 --location --max-redirs 1 'http://www.example.com'" => cmd.call('http-remote-max-redirs'),
       "curl -i -X GET --connect-timeout 60 --max-time 120 --user 'user:pass' 'http://www.example.com'" => cmd.call('http-remote-basic-auth'),
       'f77ebcedaf6fbe8f02d2f9d4735a90c12311d2ca4b43ece9efa2f2e396491747' => cmd.call('http-remote-post'),
       "curl -i -X GET --connect-timeout 60 --max-time 120 -H 'accept: application/json' -H 'foo: bar' 'http://www.example.com'" => cmd.call('http-remote-headers'),
       "curl -i -X GET --connect-timeout 60 --max-time 120 'http://www.example.com?a=b&c=d'" => cmd.call('http-remote-params'),
       "curl -i --head --connect-timeout 60 --max-time 120 'http://www.example.com'" => cmd.call('http-remote-head-request'),
-      "curl -i -X OPTIONS --connect-timeout 60 --max-time 120 -H 'Access-Control-Request-Method: GET' -H 'Access-Control-Request-Headers: origin, x-requested-with' -H 'Origin: http://www.example.com' 'http://www.example.com'" => cmd.call('http-remote-options-request'),
 
       # elasticsearch resource
       "curl -H 'Content-Type: application/json' http://localhost:9200/_nodes" => cmd.call('elasticsearch-cluster-nodes-default'),
       "curl -k -H 'Content-Type: application/json' http://localhost:9200/_nodes" => cmd.call('elasticsearch-cluster-no-ssl'),
       "curl -H 'Content-Type: application/json'  -u es_admin:password http://localhost:9200/_nodes" => cmd.call('elasticsearch-cluster-auth'),
       "curl -H 'Content-Type: application/json' http://elasticsearch.mycompany.biz:1234/_nodes" => cmd.call('elasticsearch-cluster-url'),
-      # iis_app_pool resource
-      "Import-Module WebAdministration\nIf (Test-Path 'IIS:\\AppPools\\DefaultAppPool') {\n  Get-Item 'IIS:\\AppPools\\DefaultAppPool' | Select-Object * | ConvertTo-Json -Compress\n} Else {\n  Write-Host '{}'\n}\n" => cmd.call('iis-default-app-pool'),
-
-      # iis_site resource
-      "Get-Website 'Default Web Site' | Select-Object -Property Name,State,PhysicalPath,bindings,ApplicationPool | ConvertTo-Json" => cmd.call('iis-default-web-site'),
 
       #security_policy resource calls
       'Get-Content win_secpol-abc123.cfg' => cmd.call('secedit-export'),
@@ -541,43 +493,7 @@ class MockLoader
       'Remove-Item win_secpol-abc123.cfg' => cmd.call('success'),
       "(New-Object System.Security.Principal.SecurityIdentifier(\"S-1-5-32-544\")).Translate( [System.Security.Principal.NTAccount]).Value" => cmd.call('security-policy-sid-translated'),
       "(New-Object System.Security.Principal.SecurityIdentifier(\"S-1-5-32-555\")).Translate( [System.Security.Principal.NTAccount]).Value" => cmd.call('security-policy-sid-untranslated'),
-
-      # Windows SID calls
-      'wmic useraccount where \'Name="Alice"\' get Name","SID /format:csv' => cmd.call('security-identifier-alice'),
-      'wmic useraccount where \'Name="Bob"\' get Name","SID /format:csv' => cmd.call('security-identifier-unknown'),
-      'wmic useraccount where \'Name="DontExist"\' get Name","SID /format:csv' => cmd.call('security-identifier-unknown'),
-      'wmic group where \'Name="Guests"\' get Name","SID /format:csv' => cmd.call('security-identifier-guests'),
-      'wmic group where \'Name="DontExist"\' get Name","SID /format:csv' => cmd.call('security-identifier-unknown'),
-
-      # alpine package commands
-      'apk info -vv --no-network | grep git' => cmd.call('apk-info-grep-git'),
-
-      # filesystem command
-      '2e7e0d4546342cee799748ec7e2b1c87ca00afbe590fa422a7c27371eefa88f0' => cmd.call('get-wmiobject-filesystem'),
     }
-
-    # ports on linux
-    # allow the ss and/or netstat commands to exist so the later mock is called
-    if @platform && @platform[:name] == 'alpine'
-      mock_cmds.merge!(
-        'ps --help' => cmd_stderr.call('ps-help-busybox'),
-        %{bash -c 'type "netstat"'} => cmd_exit_1.call(),
-        %{bash -c 'type "ss"'} => cmd_exit_1.call(),
-        %{which "ss"} => cmd_exit_1.call(),
-        %{which "netstat"} => empty.call(),
-        'netstat -tulpen' => cmd.call('netstat-tulpen-busybox')
-      )
-    else
-      mock_cmds.merge!(
-        'ps --help' => empty.call(),
-        %{bash -c 'type "ss"'} => empty.call(),
-        %{bash -c 'type "netstat"'} => empty.call(),
-        'ss -tulpen' => cmd.call('ss-tulpen'),
-        'netstat -tulpen' => cmd.call('netstat-tulpen')
-      )
-    end
-    mock.commands = mock_cmds
-
     @backend
   end
 
@@ -611,7 +527,7 @@ class MockLoader
 
   def self.load_profile(name, opts = {})
     opts[:test_collector] = Inspec::RunnerMock.new
-    opts[:backend] = Inspec::Backend.create(Inspec::Config.mock(opts))
+    opts[:backend] = Inspec::Backend.create(opts)
     Inspec::Profile.for_target(profile_path(name), opts)
   end
 
@@ -650,73 +566,4 @@ end
 def load_resource(*args)
   m = MockLoader.new(:ubuntu1404)
   m.send('load_resource', *args)
-end
-
-# Used to capture `Inspec.deprecate()` with warn action
-def expect_deprecation_warning
-  @mock_logger = Minitest::Mock.new
-  @mock_logger.expect(:warn, nil, [/DEPRECATION/])
-  Inspec::Log.stub :warn, proc { |message| @mock_logger.warn(message) } do
-    yield
-  end
-  @mock_logger.verify
-end
-
-# Low-level deprecation handler. Use the more convenient version when possible.
-# a_group => :expect_warn
-# a_group => :expect_fail
-# a_group => :expect_ignore
-# a_group => :expect_something
-# a_group => :tolerate # No opinion
-# all => ... # Any of the 5 values above
-# all_others => ... # Any of the 5 values above
-def handle_deprecations(opts_in, &block)
-  opts = opts_in.dup
-
-  # Determine the default expectation
-  opts[:all_others] = opts.delete(:all) if opts.key?(:all) && opts.count == 1
-  expectations = {}
-  expectations[:all_others] = opts.delete(:all_others) || :tolerate
-  expectations.merge!(opts)
-
-  # Expand the list of deprecation groups given
-  known_group_names = Inspec::Deprecation::ConfigFile.new.groups.keys
-  known_group_names.each do |group_name|
-    next if opts.key?(group_name)
-    expectations[group_name] = expectations[:all_others]
-  end
-
-  # Wire up Insepc.deprecator accordingly using mocha stubbing
-  expectations.each do |group_name, expectation|
-    inst = Inspec::Deprecation::Deprecator.any_instance
-    case expectation
-    when :tolerate
-      inst.stubs(:handle_deprecation).with(group_name, anything, anything)
-    when :expect_something
-      inst.stubs(:handle_deprecation).with(group_name, anything, anything).at_least_once
-    when :expect_warn
-      inst.stubs(:handle_warn_action).with(group_name, anything).at_least_once
-    when :expect_fail
-      inst.stubs(:handle_fail_control_action).with(group_name, anything).at_least_once
-    when :expect_ignore
-      inst.stubs(:handle_ignore_action).with(group_name, anything).at_least_once
-    when :expect_exit
-      inst.stubs(:handle_exit_action).with(group_name, anything).at_least_once
-    end
-  end
-
-  yield
-end
-
-# Use this to absorb everything.
-def tolerate_all_deprecations(&block)
-  handle_deprecations(all: :tolerate, &block)
-end
-
-def expect_deprecation_warning(group, &block)
-  handle_deprecations(group => :expect_warn, all_others: :tolerate, &block)
-end
-
-def expect_deprecation(group, &block)
-  handle_deprecations(group => :expect_something, all_others: :tolerate, &block)
 end

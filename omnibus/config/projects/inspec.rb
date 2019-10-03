@@ -1,6 +1,6 @@
 # encoding: utf-8
 #
-# Copyright:: Copyright 2016-2018, Chef Software Inc.
+# Copyright:: Copyright 2016, Chef Software Inc.
 # License:: Apache License, Version 2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -21,7 +21,7 @@ require_relative '../../../lib/inspec/version.rb'
 name 'inspec'
 friendly_name 'InSpec'
 maintainer 'Chef Software, Inc <maintainers@chef.io>'
-homepage 'https://github.com/inspec/inspec'
+homepage 'https://github.com/chef/inspec'
 
 license 'Apache-2.0'
 license_file '../LICENSE'
@@ -37,14 +37,10 @@ end
 build_version Inspec::VERSION
 build_iteration 1
 
-override 'ruby', version: '2.5.3'
+override 'ruby', version: '2.4.3'
 # RubyGems 2.7.0 caused issues in the Jenkins pipelines, trouble installing bundler.
 # This issue is not evident in 2.6.x, hence the pin.
 override 'rubygems', version: '2.6.14'
-
-# grab the current train release from rubygems.org
-train_stable = /^train \((.*)\)/.match(`gem list ^train$ --remote`)[1]
-override 'train', version: "v#{train_stable}"
 
 dependency 'preparation'
 
@@ -59,19 +55,8 @@ dependency 'openssl-customization'
 # Remove all .dll.a and .a files needed for static linkage.
 dependency 'clean-static-libs'
 
-dependency 'ruby-cleanup'
-
 package :rpm do
   signing_passphrase ENV['OMNIBUS_RPM_SIGNING_PASSPHRASE']
-  unless rhel? && platform_version.satisfies?('< 6')
-    compression_level 1
-    compression_type :xz
-  end
-end
-
-package :deb do
-  compression_level 1
-  compression_type :xz
 end
 
 package :pkg do

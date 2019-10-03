@@ -1,8 +1,9 @@
 # encoding: utf-8
+# author: Dominik Richter
+# author: Christoph Hartmann
 
 require 'utils/nginx_parser'
 require 'utils/find_files'
-require 'utils/file_reader'
 require 'forwardable'
 
 # STABILITY: Experimental
@@ -15,19 +16,17 @@ require 'forwardable'
 module Inspec::Resources
   class NginxConf < Inspec.resource(1)
     name 'nginx_conf'
-    supports platform: 'unix'
     desc 'Use the nginx_conf InSpec resource to test configuration data '\
          'for the NginX web server located in /etc/nginx/nginx.conf on '\
          'Linux and UNIX platforms.'
-    example <<~EXAMPLE
+    example "
       describe nginx_conf.params ...
       describe nginx_conf('/path/to/my/nginx.conf').params ...
-    EXAMPLE
+    "
 
     extend Forwardable
 
     include FindFiles
-    include FileReader
 
     attr_reader :contents
 
@@ -35,7 +34,6 @@ module Inspec::Resources
       @conf_path = conf_path || '/etc/nginx/nginx.conf'
       @contents = {}
       return skip_resource 'The `nginx_conf` resource is currently not supported on Windows.' if inspec.os.windows?
-      read_content(@conf_path)
     end
 
     def params
@@ -59,7 +57,11 @@ module Inspec::Resources
 
     def read_content(path)
       return @contents[path] if @contents.key?(path)
-      @contents[path] = read_file_content(path, allow_empty: true)
+      file = inspec.file(path)
+      if !file.file?
+        return skip_resource "Can't find file \"#{path}\""
+      end
+      @contents[path] = file.content
     end
 
     def parse_nginx(path)
@@ -156,8 +158,9 @@ module Inspec::Resources
     end
 
     filter = FilterTable.create
-    filter.register_column(:servers, field: 'server')
-          .install_filter_methods_on_resource(self, :server_table)
+    filter.add_accessor(:where)
+          .add(:servers, field: 'server')
+          .connect(self, :server_table)
 
     def locations
       servers.map(&:locations).flatten
@@ -183,8 +186,9 @@ module Inspec::Resources
     end
 
     filter = FilterTable.create
-    filter.register_column(:locations, field: 'location')
-          .install_filter_methods_on_resource(self, :location_table)
+    filter.add_accessor(:where)
+          .add(:locations, field: 'location')
+          .connect(self, :location_table)
 
     def to_s
       server = ''

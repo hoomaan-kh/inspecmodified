@@ -1,4 +1,6 @@
 # encoding: utf-8
+# author: Christoph Hartmann
+# author: Dominik Richter
 
 require 'utils/object_traversal'
 
@@ -9,9 +11,8 @@ module Inspec::Resources
   # We use Get-WmiObject via Powershell to retrieve all values.
   class WMI < Inspec.resource(1)
     name 'wmi'
-    supports platform: 'windows'
     desc 'request wmi information'
-    example <<~EXAMPLE
+    example "
       describe wmi({
         class: 'RSOP_SecuritySettingNumeric',
         namespace: 'root\\rsop\\computer',
@@ -19,17 +20,21 @@ module Inspec::Resources
       }) do
          its('Setting') { should eq true }
       end
-    EXAMPLE
+    "
 
     include ObjectTraverser
     attr_accessor :content
 
     def initialize(wmiclass = nil, opts = nil)
+      # verify that this resource is only supported on Windows
+      return skip_resource 'The `wmi` resource is not supported on your OS.' unless inspec.os.windows?
+
       @options = opts || {}
+      # if wmiclass is not a hash, we have to handle deprecation behavior
       if wmiclass.is_a?(Hash)
         @options.merge!(wmiclass)
       else
-        Inspec.deprecate(:wmi_non_hash_usage, 'Using `wmi(\'wmisclass\')` is deprecated. Please use`wmi({class: \'wmisclass\'})`')
+        warn '[DEPRECATION] `wmi(\'wmiclass\')` is deprecated.  Please use `wmi({class: \'wmiclass\'})` instead.'
         @options[:class] = wmiclass
       end
     end

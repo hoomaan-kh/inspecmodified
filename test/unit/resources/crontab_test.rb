@@ -79,7 +79,6 @@ describe 'Inspec::Resources::Crontab' do
   end
 
   describe 'query by path' do
-
     let(:crontab) { load_resource('crontab', { path: '/etc/cron.d/crondotd' }) }
 
     it 'prints a nice to_s string' do
@@ -156,29 +155,16 @@ describe 'Inspec::Resources::Crontab' do
   end
 
   describe 'it raises errors' do
-    it 'fails and raises error on unsupported os' do
+    it 'raises error on unsupported os' do
       resource = MockLoader.new(:windows).load_resource('crontab', { user: 'special' })
-      _(resource.resource_failed?).must_equal true
-      _(resource.resource_exception_message)
-        .must_equal 'Resource Crontab is not supported on platform windows/6.2.9200.'
+      _(resource.resource_skipped?).must_equal true
+      _(resource.resource_exception_message).must_equal 'The `crontab` resource is not supported on your OS.'
     end
 
     it 'raises error when no user or path supplied' do
       resource = load_resource('crontab', {})
       _(resource.resource_failed?).must_equal true
       _(resource.resource_exception_message).must_equal 'A user or path must be supplied.'
-    end
-
-    it 'raises error when both user or path supplied' do
-      resource = load_resource('crontab', {'user':'someuser', 'path': 'somefile'})
-      _(resource.resource_failed?).must_equal true
-      _(resource.resource_exception_message).must_equal 'Either user or path must be supplied, not both!'
-    end
-
-    it 'raises error when supplied path does not exist' do
-      resource = load_resource('crontab', {'path': '/definitely/not/there/somefile'})
-      _(resource.resource_failed?).must_equal true
-      _(resource.resource_exception_message).must_equal 'Supplied crontab path \'/definitely/not/there/somefile\' must exist!'
     end
   end
 end

@@ -8,31 +8,6 @@ module Inspec
       'additionalProperties' => false,
       'properties' => {
         'duration' => { 'type' => 'number' },
-        'controls' => {
-          'type' => 'object',
-          'optional' => true,
-          'properties' => {
-            'total' => { 'type' => 'number' },
-            'passed' => {
-              'type' => 'object',
-              'properties' => {
-                'total' => { 'type' => 'number' },
-              },
-            },
-            'skipped' => {
-              'type' => 'object',
-              'properties' => {
-                'total' => { 'type' => 'number' },
-              },
-            },
-            'failed' => {
-              'type' => 'object',
-              'properties' => {
-                'total' => { 'type' => 'number' },
-              },
-            },
-          },
-        },
       },
     }.freeze
 
@@ -42,7 +17,6 @@ module Inspec
       'properties' => {
         'name' => { 'type' => 'string' },
         'release' => { 'type' => 'string' },
-        'target_id' => { 'type' => 'string', 'optional' => true },
       },
     }.freeze
 
@@ -59,9 +33,6 @@ module Inspec
         'start_time' => { 'type' => 'string' },
         'skip_message' => { 'type' => 'string', 'optional' => true },
         'resource' => { 'type' => 'string', 'optional' => true },
-        'message' => { 'type' => 'string', 'optional' => true },
-        'exception' => { 'type' => 'string', 'optional' => true },
-        'backtrace' => { 'type' => 'object', 'optional' => true },
       },
     }.freeze
 
@@ -84,7 +55,6 @@ module Inspec
         'id' => { 'type' => 'string' },
         'title' => { 'type' => %w{string null} },
         'desc' => { 'type' => %w{string null} },
-        'descriptions' => { 'type' => %w{array} },
         'impact' => { 'type' => 'number' },
         'refs' => REFS,
         'tags' => TAGS,
@@ -104,12 +74,7 @@ module Inspec
       'type' => 'object',
       'additionalProperties' => false,
       'properties' => {
-        'platform-family' => { 'type' => 'string', 'optional' => true },
-        'platform-name' => { 'type' => 'string', 'optional' => true },
-        'platform' => { 'type' => 'string', 'optional' => true },
-        # os-* supports are being deprecated
         'os-family' => { 'type' => 'string', 'optional' => true },
-        'os-name' => { 'type' => 'string', 'optional' => true },
       },
     }.freeze
 
@@ -137,8 +102,6 @@ module Inspec
         'copyright_email' => { 'type' => 'string', 'optional' => true },
         'license' => { 'type' => 'string', 'optional' => true },
         'summary' => { 'type' => 'string', 'optional' => true },
-        'status' => { 'type' => 'string', 'optional' => false },
-        'skip_message' => { 'type' => 'string', 'optional' => true },
 
         'supports' => {
           'type' => 'array',
@@ -153,7 +116,7 @@ module Inspec
           'type' => 'array',
           'items' => CONTROL_GROUP,
         },
-        'attributes' => { # TODO: rename to inputs, refs #3802
+        'attributes' => {
           'type' => 'array',
           # TODO: more detailed specification needed
         },
@@ -171,6 +134,10 @@ module Inspec
         },
         'statistics' => STATISTICS,
         'version' => { 'type' => 'string' },
+
+        # DEPRECATED PROPERTIES!! These will be removed with the next major version bump
+        'controls' => 'array',
+        'other_checks' => 'array',
       },
     }.freeze
 
@@ -185,9 +152,6 @@ module Inspec
         'code_desc' => { 'type' => 'string' },
         'skip_message' => { 'type' => 'string', 'optional' => true },
         'resource' => { 'type' => 'string', 'optional' => true },
-        'message' => { 'type' => 'string', 'optional' => true },
-        'exception' => { 'type' => 'string', 'optional' => true },
-        'backtrace' => { 'type' => 'object', 'optional' => true },
       },
     }.freeze
 
@@ -204,17 +168,9 @@ module Inspec
       },
     }.freeze
 
-    # using a proc here so we can lazy load it when we need
-    PLATFORMS = lambda do
-      require 'train'
-      Train.create('mock').connection
-      Train::Platforms.export
-    end
-
     LIST = {
       'exec-json' => EXEC_JSON,
       'exec-jsonmin' => EXEC_JSONMIN,
-      'platforms' => PLATFORMS,
     }.freeze
 
     def self.names
@@ -222,13 +178,8 @@ module Inspec
     end
 
     def self.json(name)
-      if !LIST.key?(name)
-        raise("Cannot find schema #{name.inspect}.")
-      elsif LIST[name].is_a?(Proc)
-        v = LIST[name].call
-      else
-        v = LIST[name]
-      end
+      v = LIST[name] ||
+          raise("Cannot find schema #{name.inspect}.")
       JSON.dump(v)
     end
   end

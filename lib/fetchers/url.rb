@@ -21,21 +21,17 @@ module Fetchers
 
     def self.resolve(target, opts = {})
       if target.is_a?(Hash) && target.key?(:url)
-        resolve_from_string(target[:url], opts, target[:username], target[:password])
+        resolve_from_string(target[:url], opts)
       elsif target.is_a?(String)
         resolve_from_string(target, opts)
-      elsif target.is_a?(URI)
-        resolve_from_string(target.to_s, opts)
       end
     end
 
-    def self.resolve_from_string(target, opts, username = nil, password = nil)
+    def self.resolve_from_string(target, opts)
       uri = URI.parse(target)
       return nil if uri.nil? or uri.scheme.nil?
       return nil unless %{ http https }.include? uri.scheme
       target = transform(target)
-      opts[:username] = username if username
-      opts[:password] = password if password
       new(target, opts)
     rescue URI::Error
       nil
@@ -96,8 +92,7 @@ module Fetchers
     attr_reader :files, :archive_path
 
     def initialize(url, opts)
-      @target = url.to_s
-      @target_uri = url.is_a?(URI) ? url : parse_uri(url)
+      @target = url
       @insecure = opts['insecure']
       @token = opts['token']
       @config = opts
@@ -123,11 +118,6 @@ module Fetchers
 
     private
 
-    def parse_uri(target)
-      return URI.parse(target) if target.is_a?(String)
-      URI.parse(target[:url])
-    end
-
     def sha256
       file = @archive_path || temp_archive_path
       OpenSSL::Digest::SHA256.digest(File.read(file)).unpack('H*')[0]
@@ -146,56 +136,14 @@ module Fetchers
     end
 
     def temp_archive_path
-      @temp_archive_path ||= if @config['server_type'] == 'automate2'
-                               download_automate2_archive_to_temp
-                             else
-                               download_archive_to_temp
-                             end
-    end
-
-    def download_automate2_archive_to_temp
-      return @temp_archive_path if !@temp_archive_path.nil?
-
-      Inspec::Log.debug("Fetching URL: #{@target}")
-      json = {
-        owner: @config['profile'][0],
-        name: @config['profile'][1],
-        version: @config['profile'][2],
-      }.to_json
-
-      opts = http_opts
-      opts[:use_ssl] = @target_uri.scheme == 'https'
-
-      if @insecure
-        opts[:verify_mode] = OpenSSL::SSL::VERIFY_NONE
-      else
-        opts[:verify_mode] = OpenSSL::SSL::VERIFY_PEER
-      end
-
-      req = Net::HTTP::Post.new(@target_uri)
-      opts.each do |key, value|
-        req.add_field(key, value)
-      end
-      req.body = json
-      res = Net::HTTP.start(@target_uri.host, @target_uri.port, opts) { |http|
-        http.request(req)
-      }
-
-      @archive_type = '.tar.gz'
-      archive = Tempfile.new(['inspec-dl-', @archive_type])
-      archive.binmode
-      archive.write(res.body)
-      archive.rewind
-      archive.close
-      Inspec::Log.debug("Archive stored at temporary location: #{archive.path}")
-      @temp_archive_path = archive.path
+      @temp_archive_path ||= download_archive_to_temp
     end
 
     # Downloads archive to temporary file with side effect :( of setting @archive_type
     def download_archive_to_temp
       return @temp_archive_path if !@temp_archive_path.nil?
       Inspec::Log.debug("Fetching URL: #{@target}")
-      remote = open_via_uri(@target)
+      remote = open(@target, http_opts)
       @archive_type = file_type_from_remote(remote) # side effect :(
       archive = Tempfile.new(['inspec-dl-', @archive_type])
       archive.binmode
@@ -206,19 +154,8 @@ module Fetchers
       @temp_archive_path = archive.path
     end
 
-    def open_via_uri(target)
-      opts = http_opts
-
-      if opts[:http_basic_authentication]
-        # OpenURI does not support userinfo so we need to remove it
-        open(target.sub("#{@target_uri.userinfo}@", ''), opts)
-      else
-        open(target, opts)
-      end
-    end
-
     def download_archive(path)
-      temp_archive_path
+      download_archive_to_temp
       final_path = "#{path}#{@archive_type}"
       FileUtils.mkdir_p(File.dirname(final_path))
       FileUtils.mv(temp_archive_path, final_path)
@@ -231,7 +168,7 @@ module Fetchers
       opts = {}
       opts[:ssl_verify_mode] = OpenSSL::SSL::VERIFY_NONE if @insecure
 
-      if @config['server_type'] =~ /automate/
+      if @config['server_type'] == 'automate'
         opts['chef-delivery-enterprise'] = @config['automate']['ent']
         if @config['automate']['token_type'] == 'dctoken'
           opts['x-data-collector-token'] = @config['token']
@@ -242,10 +179,6 @@ module Fetchers
       elsif @token
         opts['Authorization'] = "Bearer #{@token}"
       end
-
-      username = @config[:username] || @target_uri.user
-      password = @config[:password] || @target_uri.password
-      opts[:http_basic_authentication] = [username, password] if username
 
       # Do not send any headers that have nil values.
       # Net::HTTP does not gracefully handle this situation.

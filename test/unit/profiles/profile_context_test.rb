@@ -78,7 +78,7 @@ describe Inspec::ProfileContext do
     end
 
     it 'must provide file resource' do
-      load('print file("/etc/passwd").type').must_output 'file'
+      load('print file("").type').must_output 'unknown'
     end
 
     it 'must provide command resource' do
@@ -110,7 +110,7 @@ describe Inspec::ProfileContext do
       end
     end
 
-    it 'does not provide the expect keyword in the global DSL' do
+    it 'does not provide the expect keyword in the global DLS' do
       load('expect(true).to_eq true').must_raise NoMethodError
     end
 
@@ -177,15 +177,6 @@ describe Inspec::ProfileContext do
         get_checks.length.must_equal 1
         get_checks[0][1][0].resource_skipped?.must_equal true
         get_checks[0][1][0].resource_exception_message.must_equal 'Skipped control due to only_if condition.'
-        get_checks[0][1][0].resource_failed?.must_equal false
-      end
-
-      it 'allows specifying a message with true only_if' do
-        profile.load("only_if('this is a only_if skipped message') { false }\n" + control)
-        get_checks.length.must_equal 1
-        get_checks[0][1][0].resource_skipped?.must_equal true
-        get_checks[0][1][0].resource_exception_message.must_equal 'Skipped' \
-         ' control due to only_if condition: this is a only_if skipped message'
         get_checks[0][1][0].resource_failed?.must_equal false
       end
 
@@ -270,7 +261,7 @@ describe Inspec::ProfileContext do
     describe 'adds a check via describe' do
       let(:check) {
         profile.load(format(context_format,
-          "describe(os[:family]) { it { must_equal 'debian' } }"
+          "describe os[:family] { it { must_equal 'debian' } }"
           ))
         get_checks[0]
       }

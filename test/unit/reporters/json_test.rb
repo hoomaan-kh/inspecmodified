@@ -13,17 +13,9 @@ describe Inspec::Reporters::Json do
 
   describe '#render' do
     it 'confirm render output' do
-      output = File.read(path + '/../mock/reporters/json_output')
+      cli_output = File.read(path + '/../mock/reporters/json_output')
       report.render
-      report.rendered_output.must_equal output
-    end
-  end
-
-  describe '#report' do
-    it 'confirm report output' do
-      output = File.read(path + '/../mock/reporters/json_output')
-      output = JSON.parse(output, symbolize_names: true)
-      report.report.must_equal output
+      report.rendered_output.must_equal cli_output
     end
   end
 
@@ -34,19 +26,33 @@ describe Inspec::Reporters::Json do
     end
   end
 
-  describe 'report output includes depends' do
-    it 'sets the depends key' do
-      depends = {
-        depends: {
-          'path' => '../child',
-          'name' => 'child',
-        }
+  describe '#controls' do
+    it 'confirm control output' do
+      hash = {
+        status: 'passed',
+        start_time: '2018-01-05 11:43:04 -0500',
+        run_time: 0.002058,
+        code_desc: 'File /tmp should be directory',
       }
-      data = JSON.parse(File.read(path + '/../mock/reporters/run_data.json'), symbolize_names: true)
-      data[:profiles].first[:depends] = depends
-      json_report = Inspec::Reporters::Json.new({ run_data: data })
+      controls = report.send(:controls)
+      controls.first.must_equal hash
+      controls.count.must_equal 4
+    end
 
-      json_report.report[:profiles].first[:depends].must_equal depends
+    it 'confirm control output with optional' do
+      report.run_data[:controls].first[:resource] = 'File'
+      report.run_data[:controls].first[:skip_message] = 'skipping'
+      hash = {
+        status: 'passed',
+        start_time: '2018-01-05 11:43:04 -0500',
+        run_time: 0.002058,
+        code_desc: 'File /tmp should be directory',
+        resource: 'File',
+        skip_message: 'skipping',
+      }
+      controls = report.send(:controls)
+      controls.first.must_equal hash
+      controls.count.must_equal 4
     end
   end
 
@@ -84,7 +90,6 @@ describe Inspec::Reporters::Json do
         id: '(generated from example.rb:7 871cd54043069c5c4f6e382fd5627830)',
         title: nil,
         desc: nil,
-        descriptions: [],
         impact: 0.5,
         refs: [],
         tags: {},
@@ -135,7 +140,7 @@ describe Inspec::Reporters::Json do
             release: '17.*',
           },
         ],
-        attributes: [], # TODO: rename  attributes in json reporter
+        attributes: [],
       }
       profile = report.send(:profiles).first
       profile.delete(:groups)

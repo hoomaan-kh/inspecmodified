@@ -1,6 +1,5 @@
 ---
 title: About the mssql_session Resource
-platform: windows
 ---
 
 # mssql_session
@@ -8,16 +7,6 @@ platform: windows
 Use the `mssql_session` InSpec audit resource to test SQL commands run against a Microsoft SQL database.
 
 <br>
-
-## Availability
-
-### Installation
-
-This resource is distributed along with InSpec itself. You can use it automatically.
-
-### Version
-
-This resource first became available in v1.24.0 of InSpec.
 
 ## Syntax
 
@@ -62,17 +51,9 @@ The following examples show how to use this InSpec audit resource.
     describe sql.query("SELECT SERVERPROPERTY('ProductVersion') as result").row(0).column('result') do
       its("value") { should cmp > '12.00.4457' }
     end
-  
-### Test a specific database
-
-    sql = mssql_session(user: 'my_user', password: 'password', db_name: 'test')
-
-    describe sql.query("SELECT Name AS result FROM Product WHERE ProductID == 1").row(0).column('result') do
-      its("value") { should eq 'foo' }
-    end
 
 <br>
 
 ## Matchers
 
-For a full list of available matchers, please visit our [matchers page](https://www.inspec.io/docs/reference/matchers/).
+For a full list of available matchers please visit our [matchers page](https://www.inspec.io/docs/reference/matchers/).

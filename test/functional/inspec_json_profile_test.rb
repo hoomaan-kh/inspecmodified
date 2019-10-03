@@ -115,45 +115,18 @@ describe 'inspec json' do
   describe 'json test for pax header archives' do
     let(:profile_tgz) { File.join(Dir.mktmpdir, "pax-profile-test.tar.gz") }
 
-    it 'successfully reads a pax-formatted tar file' do
-      # TODO: this needs updated to also support windows taring
-      return if is_windows?
+    before do
       files = Dir.glob("#{example_profile}/**/*").delete_if { |x| !File.file?(x) }
       relatives = files.map { |e| Pathname.new(e).relative_path_from(Pathname.new(example_profile)).to_s }
 
       cmd = Mixlib::ShellOut.new("tar --format=pax -czf #{profile_tgz} #{relatives.join(' ')}", cwd: example_profile)
       cmd.run_command
       cmd.error!
+    end
 
+    it 'successfully reads a pax-formatted tar file' do
       out = inspec("json #{profile_tgz}")
       out.exit_status.must_equal 0
-    end
-  end
-
-  describe 'inspec json with a inheritance profile' do
-    let(:profile) { File.join(profile_path, 'export-json', 'empty-wrapper') }
-
-    it 'can export a profile that uses inheritance' do
-      out = inspec('json ' + profile)
-      out.stderr.must_be_empty
-      out.exit_status.must_equal 0
-
-      # This will throw an exception if it is garbled
-      json = JSON.load(out.stdout)
-      # and here we verify (very passingly!) that is a structure we expect
-      json.must_be_kind_of Hash
-
-      json['controls'].each do |control|
-        control['code'].empty?.must_equal false
-      end
-    end
-  end
-
-  describe 'inspec json does not write logs to STDOUT' do
-    it 'can execute a profile with warn calls and parse STDOUT as valid JSON' do
-      out = inspec('json ' + File.join(profile_path, 'warn_logs'))
-      out.exit_status.must_equal 0
-      JSON.load(out.stdout)
     end
   end
 

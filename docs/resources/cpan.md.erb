@@ -1,6 +1,5 @@
 ---
 title: About the cpan Resource
-platform: linux
 ---
 
 # cpan
@@ -8,16 +7,6 @@ platform: linux
 Use the `cpan` InSpec audit resource to test Perl modules that are installed by system packages or the CPAN installer.
 
 <br>
-
-## Availability
-
-### Installation
-
-This resource is distributed along with InSpec itself. You can use it automatically.
-
-### Version
-
-This resource first became available in v1.43.5 of InSpec.
 
 ## Syntax
 
@@ -34,7 +23,7 @@ where
 
 <br>
 
-## Resource Parameters
+## Supported Resource Parameters
 
 This resource uses package names and perl library paths as resource parameters.
 
@@ -54,7 +43,7 @@ This resource uses package names and perl library paths as resource parameters.
       it { should be_installed }
       its('version') { should eq '3.7.0' }
     end
-
+    
 ### Test if DBD::Pg is installed within a custom PERL5LIB path on the system
 
 Hint: You can pass multiple paths separated with a colon
@@ -80,7 +69,7 @@ The `version` property tests if the named package version is on the system:
 
 ## Matchers
 
-For a full list of available matchers, please visit our [matchers page](https://www.inspec.io/docs/reference/matchers/).
+For a full list of available matchers please visit our [matchers page](https://www.inspec.io/docs/reference/matchers/). 
 
 ### be_installed
 

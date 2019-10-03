@@ -2,8 +2,6 @@
 
 We are glad you want to contribute to InSpec! This document will help answer common questions you may have during your first contribution.
 
-As a reminder, all participants are expected to follow the [Code of Conduct](https://github.com/inspec/inspec/blob/master/CODE_OF_CONDUCT.md).
-
 ## Submitting Issues
 
 We utilize **Github Issues** for issue tracking and contributions. You can contribute in two ways:
@@ -44,7 +42,8 @@ Once you open a pull request, project maintainers will review your code and resp
 2. When ready, your pull request will be merged into `master`, we may require you to rebase your PR to the latest `master`.
 3. Once the PR is merged, you will be included in `CHANGELOG.md`.
 
-If you would like to learn about when your code will be available in a release of InSpec, read more about [InSpec Release Cycles](#release-cycles).
+If you would like to learn about when your code will be available in a release of Chef, read more about [Chef Release Cycles](#release-cycles).
+
 
 ### Developer Certification of Origin (DCO)
 
@@ -69,7 +68,7 @@ By making a contribution to this project, I certify that:
 
 (b) The contribution is based upon previous work that, to the
     best of my knowledge, is covered under an appropriate open
-    source license and I have the right under that license to
+    source license and I have the right under that license to   
     submit that work with modifications, whether created in whole
     or in part by me, under the same open source license (unless
     I am permitted to submit under a different license), as
@@ -130,29 +129,17 @@ Date:   Wed Sep 18 11:44:40 2015 -0700
 
 ## Release Cycles
 
-### Release Formats
+Our primary shipping vehicle is operating system specific packages that includes all the requirements of InSpec. We call these [Omnibus packages](https://github.com/chef/omnibus)
 
-Our primary shipping vehicle is operating system specific packages that includes all the requirements of InSpec. We call these Omnibus packages, and they are available from [downloads.chef.io](https://downloads.chef.io/inspec). InSpec is also bundled with recent Chef Client and ChefDK toolkits.
-
-InSpec is also available as a [Docker image](https://hub.docker.com/r/chef/inspec) and a [Habitat package](https://bldr.habitat.sh/#/pkgs/chef/inspec/latest).
-
-Finally, we also release our software as gems to [Rubygems](https://rubygems.org/) but we strongly recommend using one of the previously packages to ensure a smooth experience.
-
-### Release Timing
-
-We typically aim to make a release every Thursday; however, if there are no changes, the release will be skipped. Releases may also be delayed due to holidays, staffing constraints, or technical problems.
-
-### Versioning
-
-This information is provided for context only.  Contributors are not expected to manage the version number of InSpec - the InSpec team and the CI system will handle any version changes needed.
+We also release our software as gems to [Rubygems](https://rubygems.org/) but we strongly recommend using InSpec or ChefDK packages.
 
 Our version numbering roughly follows [Semantic Versioning](http://semver.org/) standard. Our standard version numbers look like X.Y.Z which mean:
 
 - X is a major release, which may not be fully compatible with prior major releases
-- Y is a minor release, which adds new features and may include bug fixes
+- Y is a minor release, which adds both new features and bug fixes
 - Z is a patch release, which adds just bug fixes
 
-After shipping a release of InSpec we bump at least the `patch` version by one to start development of the next release. We do a release approximately every week. Announcements of releases are made to the [InSpec mailing list](https://discourse.chef.io/c/chef-release) when they are available.
+After shipping a release of InSpec we bump at least the `Minor` version by one to start development of the next minor release. We do a release approximately every week. Announcements of releases are made to the [InSpec mailing list](https://discourse.chef.io/c/chef-release) when they are available.
 
 ## InSpec Community
 

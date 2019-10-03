@@ -1,6 +1,5 @@
 ---
 title: About the xinetd_conf Resource
-platform: linux
 ---
 
 # xinetd_conf
@@ -9,21 +8,11 @@ Use the `xinetd_conf` InSpec audit resource to test services under `/etc/xinet.d
 
 <br>
 
-## Availability
-
-### Installation
-
-This resource is distributed along with InSpec itself. You can use it automatically.
-
-### Version
-
-This resource first became available in v1.0.0 of InSpec.
-
 ## Syntax
 
 An `xinetd_conf` resource block declares settings found in a `xinetd.conf` file for the named service:
 
-    describe xinetd_conf.services('service_name') do
+    describe xinetd_conf('service_name') do
       it { should be_enabled } # or be_disabled
       its('setting') { should eq 'value' }
     end
@@ -50,7 +39,7 @@ The network socket type: `dgram` (a datagram-based service), `raw` (a service th
 
 ### Test a service type
 
-The type of service: `INTERNAL` (a service provided by xinetd), `RPC` (an RPC-based service), `TCPMUX` (a service that is started on a well-known TCPMUX port), or `UNLISTED` (a service that is not listed in a standard system file location).
+The type of service: `INTERNAL` (a service provided by xinetd), `RPC` (an RPC-based service), `TCPMUX` (a service that is started on a well-known TPCMUX port), or `UNLISTED` (a service that is not listed in a standard system file location).
 
     describe xinetd_conf.services('service_name') do
        its('type') { should include 'RPC' }
@@ -101,9 +90,9 @@ All three settings can be tested in the same block as well:
 
 ## Matchers
 
-For a full list of available matchers, please visit our [matchers page](https://www.inspec.io/docs/reference/matchers/).
+For a full list of available matchers please visit our [matchers page](https://www.inspec.io/docs/reference/matchers/). 
 
-### be_enabled
+### be_enabed
 
 The `be_enabled` matcher tests if a service listed under `/etc/xinet.d` is enabled:
 

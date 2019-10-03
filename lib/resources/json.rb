@@ -1,14 +1,14 @@
 # encoding: utf-8
+# author: Christoph Hartmann
+# author: Dominik Richter
 
 require 'utils/object_traversal'
-require 'utils/enumerable_delegation'
-require 'utils/file_reader'
 
 module Inspec::Resources
   class JsonConfig < Inspec.resource(1)
     name 'json'
     desc 'Use the json InSpec audit resource to test data in a JSON file.'
-    example <<~EXAMPLE
+    example "
       describe json('policyfile.lock.json') do
         its(['cookbook_locks','omnibus','version']) { should eq('2.2.0') }
       end
@@ -20,10 +20,10 @@ module Inspec::Resources
       describe json({ content: '{\"item1\": { \"status\": \"available\" } }' }) do
         its(['item1', 'status']) { should cmp 'available' }
       end
-    EXAMPLE
+
+    "
 
     include ObjectTraverser
-    include FileReader
 
     # make params readable
     attr_reader :params, :raw_content
@@ -37,9 +37,6 @@ module Inspec::Resources
       # load the raw content from the source, and then parse it
       @raw_content = load_raw_content(opts)
       @params = parse(@raw_content)
-
-      # If the JSON content is enumerable, make this object enumerable too
-      extend EnumerableDelegation if @params.respond_to?(:each)
     end
 
     # Shorthand to retrieve a parameter name via `#its`.
@@ -91,7 +88,15 @@ module Inspec::Resources
     end
 
     def load_raw_from_file(path)
-      read_file_content(path)
+      file = inspec.file(path)
+
+      # these are currently ResourceSkipped to maintain consistency with the resource
+      # pre-refactor (which used skip_resource). These should likely be changed to
+      # ResourceFailed during a major version bump.
+      raise Inspec::Exceptions::ResourceSkipped, "No such file: #{path}" unless file.file?
+      raise Inspec::Exceptions::ResourceSkipped, "File #{path} is empty or is not readable by current user" if file.content.nil? || file.content.empty?
+
+      file.content
     end
 
     def load_raw_from_command(command)

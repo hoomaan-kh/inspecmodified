@@ -1,4 +1,7 @@
 # encoding: utf-8
+# author: Christoph Hartmann
+# author: Dominik Richter
+# author: Markus Grobelin
 
 # Usage:
 # describe cpan('DBD::Pg') do
@@ -9,13 +12,12 @@
 module Inspec::Resources
   class CpanPackage < Inspec.resource(1)
     name 'cpan'
-    supports platform: 'unix'
     desc 'Use the `cpan` InSpec audit resource to test Perl modules that are installed by system packages or the CPAN installer.'
-    example <<~EXAMPLE
+    example "
       describe cpan('DBD::Pg') do
         it { should be_installed }
       end
-    EXAMPLE
+    "
 
     def initialize(package_name, perl_lib_path = nil)
       @package_name = package_name

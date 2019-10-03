@@ -1,4 +1,6 @@
 # encoding: utf-8
+# author: Christoph Hartmann
+# author: Dominik Richter
 
 require 'utils/parser'
 require 'utils/filter'
@@ -9,10 +11,8 @@ require 'ipaddr'
 module Inspec::Resources
   class Port < Inspec.resource(1)
     name 'port'
-    supports platform: 'unix'
-    supports platform: 'windows'
     desc "Use the port InSpec audit resource to test basic port properties, such as port, process, if it's listening."
-    example <<~EXAMPLE
+    example "
       describe port(80) do
         it { should be_listening }
         its('protocols') {should eq ['tcp']}
@@ -22,7 +22,7 @@ module Inspec::Resources
       describe port.where { protocol =~ /tcp/ && port > 80 } do
         it { should_not be_listening }
       end
-    EXAMPLE
+    "
 
     def initialize(*args)
       args.unshift(nil) if args.length <= 1 # add the ip address to the front
@@ -39,13 +39,15 @@ module Inspec::Resources
     end
 
     filter = FilterTable.create
-    filter.register_column(:ports,     field: 'port', style: :simple)
-          .register_column(:addresses, field: 'address', style: :simple)
-          .register_column(:protocols, field: 'protocol', style: :simple)
-          .register_column(:processes, field: 'process', style: :simple)
-          .register_column(:pids,      field: 'pid', style: :simple)
-          .register_custom_matcher(:listening?) { |x| !x.entries.empty? }
-    filter.install_filter_methods_on_resource(self, :info)
+    filter.add_accessor(:where)
+          .add_accessor(:entries)
+          .add(:ports,     field: 'port', style: :simple)
+          .add(:addresses, field: 'address', style: :simple)
+          .add(:protocols, field: 'protocol', style: :simple)
+          .add(:processes, field: 'process', style: :simple)
+          .add(:pids,      field: 'pid', style: :simple)
+          .add(:listening?) { |x| !x.entries.empty? }
+    filter.connect(self, :info)
 
     def to_s
       "Port #{@port}"
@@ -63,12 +65,10 @@ module Inspec::Resources
         AixPorts.new(inspec)
       elsif os.darwin?
         # Darwin: https://developer.apple.com/library/mac/documentation/Darwin/Reference/ManPages/man8/lsof.8.html
-        # Careful: make sure darwin comes before BSD, below
         LsofPorts.new(inspec)
       elsif os.windows?
         WindowsPorts.new(inspec)
-      elsif os.bsd?
-        # Relies on sockstat, usually present on FreeBSD and NetBSD (but not MacOS X)
+      elsif ['freebsd'].include?(os[:family])
         FreeBsdPorts.new(inspec)
       elsif os.solaris?
         SolarisPorts.new(inspec)
@@ -475,26 +475,22 @@ module Inspec::Resources
 
     def parse_netstat_line(line)
       # parse each line
-      # 1 - Proto, 2 - Recv-Q, 3 - Send-Q, 4 - Local Address, 5 - Foreign Address, 6 - State, 7 - User, 8 - Inode, 9 - PID/Program name
-      # * UDP lines have an empty State column and the Busybox variant lacks
-      # the User and Inode columns.
-      reg =  /^(?<proto>\S+)\s+(\S+)\s+(\S+)\s+(?<local_addr>\S+)\s+(?<foreign_addr>\S+)\s+(\S+)?\s+((\S+)\s+(\S+)\s+)?(?<pid_prog>\S+)/
-      parsed = reg.match(line)
-
+      # 1 - Proto, 2 - Recv-Q, 3 - Send-Q, 4 - Local Address, 5 - Foreign Address, 6 - State, 7 - Inode, 8 - PID/Program name
+      parsed = /^(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)?\s+(\S+)\s+(\S+)\s+(\S+)/.match(line)
       return {} if parsed.nil? || line.match(/^proto/i)
 
       # parse ip4 and ip6 addresses
-      protocol = parsed[:proto].downcase
+      protocol = parsed[1].downcase
 
       # detect protocol if not provided
-      protocol += '6' if parsed[:local_addr].count(':') > 1 && %w{tcp udp}.include?(protocol)
+      protocol += '6' if parsed[4].count(':') > 1 && %w{tcp udp}.include?(protocol)
 
       # extract host and port information
-      host, port = parse_net_address(parsed[:local_addr], protocol)
+      host, port = parse_net_address(parsed[4], protocol)
       return {} if host.nil?
 
       # extract PID
-      process = parsed[:pid_prog].split('/')
+      process = parsed[9].split('/')
       pid = process[0]
       pid = pid.to_i if pid =~ /^\d+$/
       process = process[1]

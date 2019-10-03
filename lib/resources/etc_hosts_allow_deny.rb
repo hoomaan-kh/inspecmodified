@@ -1,27 +1,26 @@
 # encoding: utf-8
+# author: Matthew Dromazos
 
 require 'utils/parser'
-require 'utils/file_reader'
 
 module Inspec::Resources
   class EtcHostsAllow < Inspec.resource(1)
     name 'etc_hosts_allow'
-    supports platform: 'unix'
     desc 'Use the etc_hosts_allow InSpec audit resource to test the connections
           the client will allow. Controlled by the /etc/hosts.allow file.'
-    example <<~EXAMPLE
+    example "
       describe etc_hosts_allow.where { daemon == 'ALL' } do
         its('client_list') { should include ['127.0.0.1', '[::1]'] }
         its('options') { should eq [[]] }
       end
-    EXAMPLE
+    "
 
     attr_reader :params
 
     include CommentParser
-    include FileReader
 
     def initialize(hosts_allow_path = nil)
+      return skip_resource 'The `etc_hosts_allow` resource is not supported on your OS.' unless inspec.os.linux?
       @conf_path      = hosts_allow_path || '/etc/hosts.allow'
       @content        = nil
       @params         = nil
@@ -29,11 +28,13 @@ module Inspec::Resources
     end
 
     filter = FilterTable.create
-    filter.register_column(:daemon,      field: 'daemon')
-          .register_column(:client_list, field: 'client_list')
-          .register_column(:options,     field: 'options')
+    filter.add_accessor(:where)
+          .add_accessor(:entries)
+          .add(:daemon,      field: 'daemon')
+          .add(:client_list, field: 'client_list')
+          .add(:options,     field: 'options')
 
-    filter.install_filter_methods_on_resource(self, :params)
+    filter.connect(self, :params)
 
     private
 
@@ -82,21 +83,32 @@ module Inspec::Resources
     end
 
     def read_file(conf_path = @conf_path)
-      read_file_content(conf_path).lines
+      # Determine if the file exists and contains anything, if not
+      # then access control is turned off.
+      file = inspec.file(conf_path)
+      if !file.file?
+        return skip_resource "Can't find file at \"#{@conf_path}\""
+      end
+      raw_conf = file.content
+      if raw_conf.empty? && !file.empty?
+        return skip_resource("Unable to read file \"#{@conf_path}\"")
+      end
+
+      # If there is a file and it contains content, continue
+      raw_conf.lines
     end
   end
 
   class EtcHostsDeny < EtcHostsAllow
     name 'etc_hosts_deny'
-    supports platform: 'unix'
     desc 'Use the etc_hosts_deny InSpec audit resource to test the connections
           the client will deny. Controlled by the /etc/hosts.deny file.'
-    example <<~EXAMPLE
+    example "
       describe etc_hosts_deny.where { daemon_list == 'ALL' } do
         its('client_list') { should eq [['127.0.0.1', '[::1]']] }
         its('options') { should eq [] }
       end
-    EXAMPLE
+    "
 
     def initialize(path = nil)
       return skip_resource '`etc_hosts_deny` is not supported on your OS' unless inspec.os.linux?

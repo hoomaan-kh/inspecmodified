@@ -1,6 +1,5 @@
 ---
 title: About the apt Resource
-platform: linux
 ---
 
 # apt
@@ -8,16 +7,6 @@ platform: linux
 Use the `apt` InSpec audit resource to verify Apt repositories on the Debian and Ubuntu platforms, and also PPA repositories on the Ubuntu platform.
 
 <br>
-
-## Availability
-
-### Installation
-
-This resource is distributed along with InSpec itself. You can use it automatically.
-
-### Version
-
-This resource first became available in v1.0.0 of InSpec.
 
 ## Syntax
 
@@ -65,17 +54,17 @@ The following examples show how to use this InSpec audit resource.
 
 ## Matchers
 
-For a full list of available matchers, please visit our [matchers page](https://www.inspec.io/docs/reference/matchers/).
+For a full list of available matchers please visit our [matchers page](https://www.inspec.io/docs/reference/matchers/). 
 
 
 ### be_enabled
 
-The `be_enabled` matcher tests if a repository is enabled on the system:
+The `be_enabled` matcher tests if a package exists in the repository:
 
     it { should be_enabled }
 
 ### exist
 
-The `exist` matcher tests if a repository exists on the system:
+The `exist` matcher tests if a package exists on the system:
 
     it { should exist }

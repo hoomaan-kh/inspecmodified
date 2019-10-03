@@ -2,14 +2,13 @@
 # author: Adam Leff
 
 require 'inspec/profile'
-require 'inspec/config'
 
 module Inspec
   class ProfileVendor
     attr_reader :profile_path
 
     def initialize(path)
-      @profile_path = Pathname.new(File.expand_path(path))
+      @profile_path = Pathname.new(path)
     end
 
     def vendor!
@@ -50,38 +49,18 @@ module Inspec
     def profile_opts
       {
         vendor_cache: Inspec::Cache.new(cache_path.to_s),
-        backend: Inspec::Backend.create(Inspec::Config.mock),
+        backend: Inspec::Backend.create(target: 'mock://'),
       }
     end
 
     def vendor_dependencies
       delete_vendored_data
       File.write(lockfile, profile.generate_lockfile.to_yaml)
-      extract_archives
     end
 
     def delete_vendored_data
       FileUtils.rm_rf(cache_path) if cache_path.exist?
       File.delete(lockfile) if lockfile.exist?
-    end
-
-    def extract_archives
-      Dir.glob(File.join(cache_path, '*')).each do |filepath|
-        # Get SHA without extension
-        # We use split since '.' is not valid in a SHA checksum
-        destination_dir_name = File.basename(filepath).split('.')[0]
-        destination_path = File.join(cache_path, destination_dir_name)
-
-        provider = FileProvider.for_path(filepath)
-
-        next unless provider.is_a?(ZipProvider) || provider.is_a?(TarProvider)
-
-        Inspec::Log.debug("Extracting '#{filepath}' to '#{destination_path}'")
-        provider.extract(destination_path)
-
-        Inspec::Log.debug("Deleting archive '#{filepath}'")
-        File.delete(filepath)
-      end
     end
   end
 end

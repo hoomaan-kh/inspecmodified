@@ -1,4 +1,7 @@
 # encoding: utf-8
+# author: Christoph Hartmann
+# author: Dominik Richter
+# author: Markus Grobelin
 
 # Usage:
 # describe cran('DBI') do
@@ -9,13 +12,12 @@
 module Inspec::Resources
   class CranPackage < Inspec.resource(1)
     name 'cran'
-    supports platform: 'unix'
     desc 'Use the `cran` InSpec audit resource to test R modules that are installed from CRAN package repository.'
-    example <<~EXAMPLE
+    example "
       describe cran('DBI') do
         it { should be_installed }
       end
-    EXAMPLE
+    "
 
     def initialize(package_name)
       @package_name = package_name
@@ -41,7 +43,7 @@ module Inspec::Resources
       #
       # So make sure command output is converted to unicode, as it returns ASCII-8BIT by default
       utf8_stdout = cmd.stdout.chomp.force_encoding(Encoding::UTF_8)
-      params = /^\[\d+\]\s+(?:['\p{Initial_Punctuation}])(.+)(?:['\p{Final_Punctuation}])$/.match(utf8_stdout)
+      params = /^\[\d+\]\s+(?:\p{Initial_Punctuation})(.+)(?:\p{Final_Punctuation})$/.match(utf8_stdout)
       @info[:installed] = !params.nil?
       return @info unless @info[:installed]
 
